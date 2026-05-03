@@ -743,8 +743,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 <div class="modal-overlay" id="modal-add-prop">
   <div class="modal">
     <h3>🏠 새 물건 추가</h3>
-    <div class="field"><label>지역명 (동)</label><input type="text" id="new-prop-dong" placeholder="예) 개봉동, 고척동"></div>
-    <div class="field"><label>세부 주소</label><input type="text" id="new-prop-addr" placeholder="예) 308-2"></div>
+    <div class="field"><label>주소</label><input type="text" id="new-prop-addr" placeholder="예) 개봉동 308-2"></div>
     <div class="field"><label>사업 유형</label>
       <select id="new-prop-dtype">
         <option>모아타운</option><option>신통기획</option><option>일반재개발</option><option>재건축</option><option>소규모재건축</option>
@@ -762,8 +761,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
   <div class="modal">
     <h3>✏️ 물건 수정</h3>
     <input type="hidden" id="edit-prop-id">
-    <div class="field"><label>지역명 (동)</label><input type="text" id="edit-prop-dong" placeholder="예) 개봉동, 고척동"></div>
-    <div class="field"><label>세부 주소</label><input type="text" id="edit-prop-addr" placeholder="예) 308-2"></div>
+    <div class="field"><label>주소</label><input type="text" id="edit-prop-addr" placeholder="예) 개봉동 308-2"></div>
     <div class="field"><label>사업 유형</label>
       <select id="edit-prop-dtype">
         <option>모아타운</option><option>신통기획</option><option>일반재개발</option><option>재건축</option><option>소규모재건축</option>
@@ -1524,8 +1522,7 @@ function goLevel(lv, guId, propId) {
   } else {
     curGu = data.gus.find(g=>g.id===guId);
     curProp = curGu.props.find(p=>p.id===propId);
-    const displayAddr = curProp.fullAddr || (curProp.dong ? curProp.dong + ' ' + curProp.addr : curProp.addr);
-    bc.innerHTML = `<span onclick="goLevel(0)">📍 전체 구역</span><span class="sep">›</span><span onclick="goLevel(1,${curGu.id})">📍 ${curGu.name}</span><span class="sep">›</span><span class="cur">🏠 ${displayAddr}</span>`;
+    bc.innerHTML = `<span onclick="goLevel(0)">📍 전체 구역</span><span class="sep">›</span><span onclick="goLevel(1,${curGu.id})">📍 ${curGu.name}</span><span class="sep">›</span><span class="cur">🏠 ${curProp.addr}</span>`;
     renderDetail();
   }
 }
@@ -1554,80 +1551,33 @@ function renderGu() {
 function renderProps() {
   const list = document.getElementById('prop-list');
   document.getElementById('prop-count').textContent = `${curGu.name} · 물건 ${curGu.props.length}건`;
-
-  // 지역(동)별 그룹핑
-  const groups = {};
-  curGu.props.forEach(p => {
-    const dong = p.dong || '기타';
-    if (!groups[dong]) groups[dong] = [];
-    groups[dong].push(p);
-  });
-
-  const dongList = Object.keys(groups).sort();
-
-  list.innerHTML = dongList.map(dong => {
-    const props = groups[dong];
-    const normalProps   = props.filter(p => {
-      const lv = p.visits[p.visits.length-1];
-      return !lv || lv.mode !== '경매';
-    });
-    const auctionProps  = props.filter(p => {
-      const lv = p.visits[p.visits.length-1];
-      return lv && lv.mode === '경매';
-    });
-
-    const renderPropRow = (p) => {
-      const lv = p.visits[p.visits.length-1];
-      const jd = lv?.judge || '';
-      const hasVisit = p.visits.length > 0;
-      const fullAddr = p.fullAddr || (p.dong ? p.dong + ' ' + p.addr : p.addr);
-      const asilUrl = `https://asil.kr/asil/search.jsp?keyword=${encodeURIComponent(curGu.name + ' ' + fullAddr)}`;
-      const bidDate = lv?.mode === '경매' && lv?.auction?.bidDate ? lv.auction.bidDate : null;
-      const diff = bidDate ? Math.round((new Date(bidDate) - new Date().setHours(0,0,0,0)) / 86400000) : null;
-      const ddayBadge = diff !== null
-        ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${diff<=0?'#fdf0f0':diff<=1?'#fff3e0':'#fffde7'};color:${diff<=0?'#c0392b':diff<=1?'#e67e00':'#f57f17'};font-weight:700;border:1px solid ${diff<=0?'#e53935':diff<=1?'#fb8c00':'#f9a825'}">D-${diff}</span>`
-        : '';
-
-      return `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:7px;cursor:pointer;transition:border-color 0.15s"
-        onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'"
-        onclick="goLevel(2,${curGu.id},${p.id})">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
-            <span style="font-size:14px;font-weight:700;color:var(--text)">${p.addr}</span>
-            ${ddayBadge}
-            <span style="font-size:11px;color:var(--text3)">${p.dtype}</span>
-          </div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <span class="badge ${hasVisit?'b':'n'}">${hasVisit?'👣 답사완료':'🔍 손품 중'}</span>
-            ${lv?`<span class="badge ${judgeClass(jd)}">${judgeLabel(jd)}</span>`:''}
-            <span class="badge n">방문 ${p.visits.length}회</span>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+  list.innerHTML = curGu.props.map(p => {
+    const lv = p.visits[p.visits.length-1];
+    const jd = lv?.judge||'';
+    const asilUrl = `https://asil.kr/asil/search.jsp?keyword=${encodeURIComponent(curGu.name + ' ' + p.addr)}`;
+    return `<div class="prop-card" onclick="goLevel(2,${curGu.id},${p.id})">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap">
+          <div class="prop-addr">${p.addr}</div>
           <button onclick="event.stopPropagation();openEditProp('${p.id}')"
-            style="background:var(--info-light);color:var(--info);border:1px solid #c5d4f0;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ 수정</button>
+            style="background:var(--info-light);color:var(--info);border:1px solid #c5d4f0;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);white-space:nowrap">✏️ 수정</button>
           <a href="${asilUrl}" target="_blank" onclick="event.stopPropagation()"
-            style="background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);text-decoration:none;white-space:nowrap">🔎 아실</a>
+            style="background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🔎 아실</a>
         </div>
-      </div>`;
-    };
-
-    return `
-    <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--accent-light)">
-        <span style="font-size:14px;font-weight:700;color:var(--accent)">📍 ${dong}</span>
-        <span style="font-size:11px;color:var(--text3)">${props.length}건</span>
+        <div class="prop-meta">${p.dtype} · ${p.stage}</div>
+        <div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap">
+          <span class="badge b">방문 ${p.visits.length}회</span>
+          ${lv?`<span class="badge ${judgeClass(jd)}">${judgeLabel(jd)}</span>`:''}
+          ${lv?`<span class="badge n">${lv.date}</span>`:''}
+        </div>
       </div>
-      ${normalProps.length ? `
-        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px">🏠 일반매물 ${normalProps.length}건</div>
-        ${normalProps.map(renderPropRow).join('')}` : ''}
-      ${auctionProps.length ? `
-        <div style="font-size:11px;font-weight:600;color:var(--warn);margin-bottom:5px;margin-top:${normalProps.length?'10px':'0'}">⚖️ 경매물건 ${auctionProps.length}건</div>
-        ${auctionProps.map(renderPropRow).join('')}` : ''}
+      <div style="text-align:right">
+        <div class="prop-visits">${p.visits.length}</div>
+        <div class="prop-visits-label">방문</div>
+        ${lv?.price?`<div style="font-size:12px;font-weight:600;font-family:var(--mono);margin-top:4px">${fmt(lv.price)}만</div>`:''}
+      </div>
     </div>`;
   }).join('');
-
   list.innerHTML += `<button class="add-card" onclick="openModal('modal-add-prop')">+ 물건 추가</button>`;
 }
 
@@ -2161,8 +2111,7 @@ function openMap() {
 
 function updateMapLink() {
   if (!curProp) return;
-  const fullAddr = curProp.fullAddr || (curProp.dong ? curProp.dong + ' ' + curProp.addr : curProp.addr);
-  const addr = curGu.name + ' ' + fullAddr;
+  const addr = curGu.name + ' ' + curProp.addr;
   renderKakaoMap(addr);
 }
 
@@ -2308,19 +2257,10 @@ function addGu() {
 }
 
 function addProp() {
-  const dong = document.getElementById('new-prop-dong').value.trim();
   const addr = document.getElementById('new-prop-addr').value.trim();
-  if (!addr) { alert('세부 주소를 입력해주세요'); return; }
-  curGu.props.push({
-    id: genId(),
-    dong: dong,
-    addr: addr,
-    fullAddr: dong ? dong + ' ' + addr : addr,
-    dtype: document.getElementById('new-prop-dtype').value,
-    stage: '', area: {}, visits: []
-  });
+  if (!addr) { alert('주소를 입력해주세요'); return; }
+  curGu.props.push({ id: genId(), addr, dtype: document.getElementById('new-prop-dtype').value, stage: '', area: {}, visits: [] });
   saveData(); closeModal('modal-add-prop');
-  document.getElementById('new-prop-dong').value = '';
   document.getElementById('new-prop-addr').value = '';
   renderProps();
 }
@@ -2947,7 +2887,6 @@ function openEditProp(propId) {
   const prop = curGu.props.find(p => String(p.id) === String(propId));
   if (!prop) return;
   document.getElementById('edit-prop-id').value = propId;
-  document.getElementById('edit-prop-dong').value = prop.dong || '';
   document.getElementById('edit-prop-addr').value = prop.addr;
   const dtypeEl = document.getElementById('edit-prop-dtype');
   for (let i = 0; i < dtypeEl.options.length; i++) {
@@ -2960,12 +2899,9 @@ function saveEditProp() {
   const propId = document.getElementById('edit-prop-id').value;
   const prop = curGu.props.find(p => String(p.id) === String(propId));
   if (!prop) return;
-  const dong = document.getElementById('edit-prop-dong').value.trim();
   const addr = document.getElementById('edit-prop-addr').value.trim();
-  if (!addr) { alert('세부 주소를 입력해주세요'); return; }
-  prop.dong = dong;
+  if (!addr) { alert('주소를 입력해주세요'); return; }
   prop.addr = addr;
-  prop.fullAddr = dong ? dong + ' ' + addr : addr;
   prop.dtype = document.getElementById('edit-prop-dtype').value;
   saveData();
   closeModal('modal-edit-prop');
