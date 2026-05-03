@@ -598,6 +598,15 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
         <div class="notice-item">일 1회 자동 백업 (JEJERECORD/backup/ 폴더)</div>
       </div>
     </div>
+    <!-- 낙찰기일 임박 섹션 -->
+    <div id="bid-alert-section" style="display:none;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:700;color:var(--text)">⚖️ 낙찰기일 임박 경매</span>
+        <span id="bid-alert-count" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div id="bid-alert-list"></div>
+    </div>
+
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:12px;color:var(--text3)" id="gu-count"></div>
     </div>
@@ -1506,6 +1515,7 @@ function renderGu() {
       </div>
     </div>`;
   }).join('');
+  checkBidDateAlerts();
 }
 
 // ── 2단계 ────────────────────────────────────────────────────────
@@ -2319,49 +2329,82 @@ function calcGap() {
   document.getElementById('v-gap').value = p&&j ? fmt(p-j)+'만' : '';
 }
 
-// ── 낙찰기일 알림 배너 ────────────────────────────────────────
+// ── 낙찰기일 임박 섹션 렌더링 ─────────────────────────────────
 function checkBidDateAlerts() {
   const today = new Date(); today.setHours(0,0,0,0);
+
+  // 낙찰기일 있고 결과 없는 경매 물건 전체 수집
   const alerts = [];
   data.gus.forEach(gu => {
     gu.props.forEach(prop => {
       prop.visits.forEach(visit => {
         if (visit.mode !== '경매' || !visit.auction?.bidDate) return;
-        if (visit.auction.bidResult) return; // 결과 있으면 스킵
+        if (visit.auction.bidResult) return; // 결과 기록된 건 제외
         const bid = new Date(visit.auction.bidDate); bid.setHours(0,0,0,0);
         const diff = Math.round((bid - today) / (1000*60*60*24));
-        if (diff === 7 || diff === 1 || diff === 0) {
-          alerts.push({ gu, prop, visit, diff });
-        }
+        alerts.push({ gu, prop, visit, diff });
       });
     });
   });
-  if (!alerts.length) return;
-  const container = document.getElementById('bid-alert-container') || createBidAlertContainer();
-  container.innerHTML = alerts.map(({gu, prop, visit, diff}) => {
-    const label = diff === 0 ? '🔴 오늘 입찰!' : diff === 1 ? '🟠 내일 입찰!' : '🟡 7일 후 입찰';
-    const color = diff === 0 ? '#7c1e1e' : diff === 1 ? '#c0392b' : '#e67e00';
-    const bg = diff === 0 ? '#fdf0f0' : diff <= 1 ? '#fff0e0' : '#fffbe0';
-    return `<div style="background:${bg};border:1px solid ${color};border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <div>
-        <div style="font-size:12px;font-weight:700;color:${color}">${label}</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px">${gu.name} ${prop.addr}</div>
-        <div style="font-size:11px;color:var(--text3)">입찰일: ${visit.auction.bidDate}${visit.auction.myBid ? ` · 내 입찰가: ${fmt(visit.auction.myBid)}만` : ''}</div>
+
+  const section = document.getElementById('bid-alert-section');
+  const list    = document.getElementById('bid-alert-list');
+  const count   = document.getElementById('bid-alert-count');
+  if (!section || !list) return;
+
+  if (!alerts.length) { section.style.display = 'none'; return; }
+
+  // D-day 오름차순 정렬
+  alerts.sort((a, b) => a.diff - b.diff);
+
+  section.style.display = 'block';
+  count.textContent = `총 ${alerts.length}건`;
+
+  list.innerHTML = alerts.map(({ gu, prop, visit, diff }) => {
+    const auc = visit.auction;
+    let ddayLabel, bgColor, borderColor, textColor;
+    if (diff < 0) {
+      ddayLabel = `D+${Math.abs(diff)} (기일 경과)`;
+      bgColor = '#f5f5f5'; borderColor = '#ccc'; textColor = 'var(--text3)';
+    } else if (diff === 0) {
+      ddayLabel = '🔴 오늘!';
+      bgColor = '#fdf0f0'; borderColor = '#e53935'; textColor = '#c0392b';
+    } else if (diff === 1) {
+      ddayLabel = '🟠 내일 (D-1)';
+      bgColor = '#fff3e0'; borderColor = '#fb8c00'; textColor = '#e67e00';
+    } else if (diff <= 7) {
+      ddayLabel = `🟡 D-${diff}`;
+      bgColor = '#fffde7'; borderColor = '#f9a825'; textColor = '#f57f17';
+    } else {
+      ddayLabel = `D-${diff}`;
+      bgColor = 'var(--surface)'; borderColor = 'var(--border)'; textColor = 'var(--text2)';
+    }
+
+    const rate = auc.myBid && auc.appraise
+      ? ` · 입찰률 ${(auc.myBid/auc.appraise*100).toFixed(1)}%` : '';
+
+    return `
+    <div onclick="goLevel(2,${gu.id},${prop.id})"
+      style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;transition:opacity 0.15s"
+      onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:700;color:${textColor}">${ddayLabel}</span>
+          <span style="font-size:11px;color:var(--text3)">${auc.bidDate}</span>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${gu.name} ${prop.addr}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">
+          ${auc.case || '사건번호 미입력'} · 최저 ${fmt(auc.minBid)}만${auc.myBid ? ` · 내 입찰 ${fmt(auc.myBid)}만${rate}` : ''}
+        </div>
       </div>
-      <button onclick="goLevel(2,${gu.id},${prop.id});this.closest('#bid-alert-container').style.display='none'"
-        style="padding:6px 12px;background:${color};color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;white-space:nowrap">상세보기</button>
+      <div style="font-size:20px;font-weight:800;color:${textColor};white-space:nowrap;font-family:var(--mono)">
+        ${diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`}
+      </div>
     </div>`;
   }).join('');
-  container.style.display = 'block';
 }
 
-function createBidAlertContainer() {
-  const el = document.createElement('div');
-  el.id = 'bid-alert-container';
-  el.style.cssText = 'display:none;position:fixed;bottom:20px;right:20px;z-index:500;max-width:360px;width:90%';
-  document.body.appendChild(el);
-  return el;
-}
+function createBidAlertContainer() { return null; } // 레거시 호환용
 
 
 
