@@ -1,1 +1,3076 @@
 <!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재개발 투자 분석기 v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=6b3aa2fa2145760a95bb8b7a8fb18acf&libraries=services"></script>
+<style>
+:root {
+  --bg: #f0f2f8; --surface: #ffffff; --surface2: #eaecf4;
+  --border: #d0d4e8; --text: #0f1733; --text2: #4a5070; --text3: #8890aa;
+  --accent: #1a3a8f; --accent-light: #e8edf8; --accent-text: #0f2266;
+  --warn: #7c5a00; --warn-light: #fff8e0;
+  --danger: #7c1e1e; --danger-light: #fdf0f0;
+  --info: #1565c0; --info-light: #e3f0ff;
+  --mono: 'IBM Plex Mono', monospace; --sans: 'Noto Sans KR', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+.header {
+  background: linear-gradient(135deg, #0d1f5c, #1a3a8f);
+  color: #fff; padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  flex-wrap: wrap; gap: 8px;
+}
+.header h1 { font-size: 15px; font-weight: 700; }
+.header p { font-size: 11px; opacity: 0.65; }
+.header-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hbtn {
+  padding: 6px 12px; font-size: 12px; font-weight: 500; font-family: var(--sans);
+  background: rgba(255,255,255,0.15); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; cursor: pointer;
+}
+.hbtn.tax { background: #f5a623; color: #fff; border-color: #f5a623; font-weight: 700; }
+
+.breadcrumb {
+  padding: 9px 20px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text3);
+  display: flex; align-items: center; gap: 5px;
+}
+.breadcrumb span { cursor: pointer; }
+.breadcrumb span:hover { color: var(--accent); }
+.breadcrumb .cur { color: var(--text); font-weight: 500; }
+.breadcrumb .sep { color: var(--border); }
+
+.container { max-width: 900px; margin: 0 auto; padding: 16px 14px 40px; }
+
+/* 구 카드 */
+.gu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 10px; margin-bottom: 12px; }
+.gu-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 18px; cursor: pointer; transition: all 0.15s;
+}
+.gu-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,58,143,0.12); }
+.gu-icon { font-size: 26px; margin-bottom: 6px; }
+.gu-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.gu-meta { font-size: 11px; color: var(--text3); }
+.gu-stats { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.gu-stat { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--accent-light); color: var(--accent); font-weight: 500; }
+
+/* 물건 카드 */
+.prop-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; cursor: pointer; margin-bottom: 10px; transition: all 0.15s;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.prop-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(26,58,143,0.1); }
+.prop-addr { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.prop-meta { font-size: 12px; color: var(--text3); }
+.prop-visits { font-size: 22px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+.prop-visits-label { font-size: 11px; color: var(--text3); }
+
+/* Badge */
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.badge.g { background: var(--accent-light); color: var(--accent); }
+.badge.y { background: var(--warn-light); color: var(--warn); }
+.badge.r { background: var(--danger-light); color: var(--danger); }
+.badge.b { background: var(--info-light); color: var(--info); }
+.badge.n { background: var(--surface2); color: var(--text3); }
+
+/* 지역개요 */
+.area-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.area-box-header { background: linear-gradient(135deg, #0d1f5c, #1a3a8f); color: #fff; padding: 12px 16px; font-size: 13px; font-weight: 700; }
+.area-box-body { padding: 14px 16px; }
+
+/* 지도 영역 */
+.map-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.map-panel {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+}
+.map-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.map-panel-header button {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.map-panel-header button:hover { border-color: var(--accent); color: var(--accent); }
+/* 왼쪽: 카카오맵 */
+.map-kakao-placeholder {
+  height: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.map-kakao-placeholder:hover { background: var(--accent-light); color: var(--accent); }
+/* 오른쪽: 구획도 */
+.map-zone-area {
+  height: 170px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.map-zone-img {
+  width: 100%;
+  height: 170px;
+  object-fit: contain;
+  display: block;
+  cursor: zoom-in;
+}
+.map-zone-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--text3);
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  transition: all 0.15s;
+}
+.map-zone-empty:hover { background: var(--accent-light); color: var(--accent); }
+/* 방문 사진 */
+.visit-photos { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.visit-photo-thumb {
+  width: 58px; height: 58px;
+  border-radius: 6px;
+  object-fit: cover;
+  cursor: zoom-in;
+  border: 1px solid var(--border);
+  transition: transform 0.12s;
+}
+.visit-photo-thumb:hover { transform: scale(1.06); border-color: var(--accent); }
+.v-preview-item {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.v-preview-item img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.v-preview-del {
+  position: absolute; top: 2px; right: 2px;
+  width: 16px; height: 16px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.img-lightbox {
+  display: none;
+  position: fixed; inset: 0;
+  z-index: 2000;
+  background: rgba(0,0,0,0.9);
+  align-items: center;
+  justify-content: center;
+}
+.img-lightbox.open { display: flex; }
+.img-lightbox img { max-width: 92vw; max-height: 88vh; object-fit: contain; border-radius: 8px; }
+.img-lightbox-close {
+  position: absolute; top: 18px; right: 22px;
+  font-size: 28px; color: #fff; cursor: pointer;
+  background: none; border: none; line-height: 1;
+}
+@media (max-width: 600px) {
+  .map-section { grid-template-columns: 1fr; }
+}
+
+/* 진행단계 아코디언 */
+.stage-stepper { margin-bottom: 14px; }
+.stage-stepper-title { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+.stage-current-display {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;
+  font-size: 12px; color: var(--text2);
+}
+.stage-current-val { font-weight: 700; color: var(--text); }
+.stage-groups { display: flex; flex-direction: column; gap: 4px; }
+.stage-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; transition: all 0.12s; user-select: none;
+}
+.stage-group-header:hover { border-color: var(--accent); background: var(--accent-light); }
+.stage-group-header.has-active { border-color: var(--accent); background: var(--accent-light); }
+.stage-group-name { font-size: 12px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+.stage-group-header.has-active .stage-group-name { color: var(--accent); }
+.stage-group-arrow { font-size: 11px; color: var(--text3); transition: transform 0.2s; }
+.stage-group-header.open .stage-group-arrow { transform: rotate(180deg); }
+.stage-steps-dropdown {
+  display: none; padding: 6px 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: none; border-radius: 0 0 8px 8px;
+  margin-top: -4px; flex-wrap: wrap; gap: 4px;
+}
+.stage-steps-dropdown.open { display: flex; }
+.stage-step {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text3); cursor: pointer; transition: all 0.12s; font-family: var(--sans);
+}
+.stage-step:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.stage-step.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.stage-step.active.warn { background: var(--warn); border-color: var(--warn); }
+.stage-step.active.done { background: var(--info); border-color: var(--info); }
+
+/* 정보 그리드 */
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.info-box { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+.info-box-title { font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 5px; }
+.info-box textarea { width: 100%; background: transparent; border: none; resize: none; font-size: 12px; font-family: var(--sans); color: var(--text); line-height: 1.7; outline: none; height: 72px; }
+
+/* 시세 */
+.price-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.price-item { flex: 1; min-width: 130px; background: var(--surface2); border-radius: 8px; padding: 9px 12px; }
+.price-item .pl { font-size: 11px; color: var(--text3); margin-bottom: 2px; }
+.price-item input { width: 100%; background: transparent; border: none; outline: none; font-size: 15px; font-weight: 700; font-family: var(--mono); color: var(--text); padding: 0; }
+
+/* 방문 타임라인 */
+.visit-timeline { position: relative; }
+.visit-timeline::before { content: ''; position: absolute; left: 14px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+.visit-item { position: relative; padding-left: 40px; margin-bottom: 10px; }
+.visit-dot { position: absolute; left: 7px; top: 14px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 2px var(--accent); z-index: 1; }
+.visit-dot.auction { background: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
+.visit-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.visit-header { padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.visit-header:hover { background: var(--surface2); }
+.visit-date { font-size: 13px; font-weight: 700; }
+.visit-type-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.visit-type-badge.normal { background: var(--accent-light); color: var(--accent); }
+.visit-type-badge.auction { background: var(--warn-light); color: var(--warn); }
+.visit-body { padding: 12px 14px; border-top: 1px solid var(--border); }
+.visit-body.hidden { display: none; }
+
+/* 수 그리드 */
+.num-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-bottom: 10px; }
+.num-item { background: var(--surface2); border-radius: 8px; padding: 9px 10px; }
+.num-item .nl { font-size: 11px; color: var(--text3); margin-bottom: 2px; }
+.num-item .nv { font-size: 14px; font-weight: 700; font-family: var(--mono); }
+.num-item .nv.pos { color: var(--accent); }
+.num-item .nv.neg { color: var(--danger); }
+.num-item .nv.info { color: var(--info); }
+
+/* 경매 박스 */
+.auction-box { background: var(--warn-light); border: 1px solid #f0c878; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.auction-box-title { font-size: 12px; font-weight: 700; color: var(--warn); margin-bottom: 7px; }
+.auction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.auction-field .af-label { font-size: 10px; color: var(--text3); }
+.auction-field .af-val { font-size: 13px; font-weight: 600; }
+
+/* 수익분석 패널 */
+.profit-panel { display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #c5d4f0; }
+.profit-panel.open { display: block; }
+
+/* 수익분석 탭 */
+.profit-tabs { display: flex; background: #e8eef8; border-bottom: 1px solid #c5d4f0; }
+.profit-tab {
+  flex: 1; padding: 9px; font-size: 12px; font-weight: 600;
+  font-family: var(--sans); border: none; background: transparent;
+  color: var(--text3); cursor: pointer; transition: all 0.12s;
+}
+.profit-tab:hover { color: var(--info); }
+.profit-tab.active { background: var(--surface); color: var(--info); border-bottom: 2px solid var(--info); }
+.profit-tab-content { display: none; padding: 14px; background: var(--info-light); }
+.profit-tab-content.active { display: block; }
+
+.profit-panel-subtitle { font-size: 11px; font-weight: 600; color: var(--info); margin: 10px 0 6px; border-bottom: 1px solid #c5d4f0; padding-bottom: 4px; letter-spacing: 0.02em; }
+.profit-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(197,212,240,0.4); font-size: 13px; }
+.profit-row:last-child { border-bottom: none; }
+.profit-row.total { border-top: 2px solid #c5d4f0; margin-top: 4px; padding-top: 8px; }
+.profit-label { color: var(--text2); font-size: 12px; }
+.profit-val { font-weight: 700; font-family: var(--mono); }
+.profit-val.pos { color: var(--accent); }
+.profit-val.neg { color: var(--danger); }
+.profit-val.warn { color: var(--warn); }
+.profit-val.big { font-size: 16px; }
+
+.profit-input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 10px; }
+.profit-input-group { display: flex; flex-direction: column; gap: 3px; }
+.profit-input-group label { font-size: 11px; color: var(--text3); }
+.profit-input-group select,
+.profit-input-group input {
+  font-family: var(--sans); font-size: 13px; padding: 6px 8px;
+  border: 1px solid #c5d4f0; border-radius: 6px;
+  background: rgba(255,255,255,0.85); color: var(--text); outline: none;
+}
+.profit-input-group input.auto-val {
+  background: rgba(255,255,255,0.5); color: var(--info);
+  font-weight: 700; font-family: var(--mono);
+}
+
+/* 버튼 */
+.btn { padding: 8px 16px; font-size: 12px; font-weight: 500; font-family: var(--sans); border-radius: 8px; cursor: pointer; }
+.btn-primary { background: var(--accent); color: #fff; border: none; }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-profit { background: var(--info-light); color: var(--info); border: 1px solid #c5d4f0; font-weight: 600; }
+.btn-profit:hover { background: var(--info); color: #fff; }
+.btn-row { display: flex; gap: 8px; margin-top: 12px; }
+.add-visit-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px; border: 2px dashed var(--border); border-radius: 10px;
+  cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text3);
+  background: transparent; width: 100%; font-family: var(--sans); transition: all 0.15s;
+}
+.add-visit-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.add-card {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 18px;
+  text-align: center; cursor: pointer; color: var(--text3); font-size: 13px;
+  font-weight: 500; transition: all 0.15s; background: transparent; font-family: var(--sans); width: 100%;
+}
+.add-card:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+/* field */
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field label { font-size: 11px; font-weight: 500; color: var(--text2); }
+.field input, .field select, .field textarea {
+  font-family: var(--sans); font-size: 13px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); outline: none;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: center; justify-content: center; padding: 16px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border-radius: 16px; width: 100%; max-width: 500px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+
+/* 세금 모달 */
+.tax-modal { max-width: 720px; }
+.tax-tab-row { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.tax-tab { padding: 6px 14px; font-size: 12px; font-weight: 500; font-family: var(--sans); border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text2); cursor: pointer; }
+.tax-tab.active { background: #f5a623; color: #fff; border-color: #f5a623; }
+.tax-section { display: none; }
+.tax-section.active { display: block; }
+.tax-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tax-table th { background: var(--surface2); padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); }
+.tax-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.tax-table tr:last-child td { border-bottom: none; }
+.tax-table tr:hover td { background: var(--surface2); }
+.tax-note { background: var(--accent-light); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--accent-text); line-height: 1.8; margin-top: 12px; }
+
+/* sec-t */
+.sec-t { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 8px; margin-top: 12px; }
+
+@media (max-width: 600px) {
+  .gu-grid { grid-template-columns: 1fr 1fr; }
+  .num-grid { grid-template-columns: 1fr 1fr; }
+  .info-grid { grid-template-columns: 1fr; }
+  .profit-input-grid { grid-template-columns: 1fr; }
+  .auction-grid { grid-template-columns: 1fr; }
+}
+
+/* 로그인 화면 */
+.login-screen {
+  display: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(135deg, #0d1f5c, #1a3a8f);
+  align-items: center; justify-content: center;
+  flex-direction: column;
+}
+.login-screen.active { display: flex; }
+.login-box {
+  background: #fff; border-radius: 20px;
+  padding: 40px 36px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  max-width: 340px; width: 90%;
+}
+.login-logo { font-size: 40px; margin-bottom: 10px; }
+.login-title { font-size: 18px; font-weight: 700; color: #1a1915; margin-bottom: 4px; }
+.login-sub { font-size: 12px; color: #9e9b93; margin-bottom: 28px; }
+.login-error { font-size: 12px; color: #7c1e1e; background: #fdf0f0; border-radius: 8px; padding: 8px 12px; margin-top: 14px; display: none; }
+.login-user {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--accent-light); border-radius: 20px;
+  padding: 5px 12px 5px 6px; font-size: 12px; color: var(--accent-text);
+}
+.login-user img { width: 22px; height: 22px; border-radius: 50%; }
+
+/* 업데이트 공지 */
+.notice-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;
+}
+.notice-box-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.notice-box-title { font-size: 12px; font-weight: 700; color: var(--accent); }
+.notice-item { font-size: 12px; color: var(--text2); line-height: 1.8; }
+.notice-item::before { content: '· '; color: var(--accent); font-weight: 700; }
+
+/* 서명 */
+.signature {
+  position: fixed; bottom: 12px; right: 16px;
+  font-size: 11px; color: var(--text3);
+  font-family: var(--mono); letter-spacing: 0.03em;
+  pointer-events: none; z-index: 10;
+}
+</style>
+</head>
+<body>
+
+<!-- 로그인 화면 -->
+<div class="login-screen active" id="login-screen">
+
+  <!-- 단계1: 로그인/회원가입 선택 -->
+  <div class="login-box" id="ls-main">
+    <div class="login-logo">🏘</div>
+    <div class="login-title">재개발 투자 분석기</div>
+    <div class="login-sub" style="margin-bottom:20px">구글 계정으로 로그인 또는 회원가입</div>
+    <div id="g_id_signin"></div>
+    <div style="margin-top:14px;font-size:11px;color:#9e9b93">
+      처음 방문이라면 구글 로그인 후 회원가입을 진행합니다
+    </div>
+  </div>
+
+  <!-- 단계2: 회원가입 (구글 로그인 후 이름 입력) -->
+  <div class="login-box" id="ls-register" style="display:none">
+    <div class="login-logo">✍️</div>
+    <div class="login-title">회원가입</div>
+    <div class="login-sub">처음 방문하셨습니다. 이름을 입력해주세요</div>
+    <div id="ls-register-email" style="font-size:12px;color:#6b6860;margin-bottom:14px;padding:6px 12px;background:#f0efe9;border-radius:8px"></div>
+    <input id="register-name" type="text" placeholder="이름 (예: 홍길동)"
+      style="width:100%;padding:10px 14px;border:1.5px solid #e0ddd5;border-radius:10px;font-size:14px;font-family:inherit;outline:none;margin-bottom:12px">
+    <button onclick="submitRegister()"
+      style="width:100%;padding:11px;background:linear-gradient(135deg,#0d1f5c,#1a3a8f);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+      가입 신청
+    </button>
+    <div class="login-error" id="register-error" style="margin-top:10px"></div>
+  </div>
+
+  <!-- 단계3: 승인 대기 -->
+  <div class="login-box" id="ls-pending" style="display:none">
+    <div class="login-logo">⏳</div>
+    <div class="login-title">승인 대기 중</div>
+    <div class="login-sub" style="line-height:1.8">
+      가입 신청이 완료됐습니다.<br>
+      관리자 승인 후 이용 가능합니다.<br>
+      <span style="font-size:11px;color:#9e9b93">승인 후 다시 로그인해주세요</span>
+    </div>
+    <button onclick="signOut()" style="margin-top:18px;padding:8px 24px;background:#f0efe9;color:#6b6860;border:1px solid #e0ddd5;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit">
+      로그아웃
+    </button>
+  </div>
+
+  <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,0.4)">made by Jinahyoon</div>
+</div>
+
+<!-- 관리자 모달 -->
+<div class="modal-overlay" id="modal-admin">
+  <div class="modal" style="max-width:500px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">👑 회원 관리</h3>
+      <button onclick="closeModal('modal-admin')" class="btn btn-secondary" style="padding:4px 12px;font-size:12px">✕ 닫기</button>
+    </div>
+    <div id="admin-pending" style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">⏳ 승인 대기</div>
+      <div id="admin-pending-list" style="font-size:12px;color:var(--text3)">불러오는 중...</div>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">✅ 승인된 회원</div>
+      <div id="admin-approved-list" style="font-size:12px;color:var(--text3)">불러오는 중...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 서명 -->
+<div class="signature">made by Jinahyoon</div>
+
+<div class="header">
+  <div>
+    <h1>🏘 재개발 투자 분석기 v3</h1>
+    <p>구역 · 물건 · 방문 3단계 관리</p>
+  </div>
+  <div class="header-right">
+    <div id="header-user" style="display:none;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 10px 4px 5px">
+      <img id="header-avatar" src="" alt="" style="width:22px;height:22px;border-radius:50%">
+      <span id="header-name" style="font-size:11px;color:#fff"></span>
+      <button onclick="signOut()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:10px;padding:2px 7px;font-size:10px;cursor:pointer;font-family:var(--sans);margin-left:2px">로그아웃</button>
+    </div>
+    <span id="sync-status" style="font-size:11px;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:10px"></span>
+    <button class="hbtn" onclick="loadFromDrive()" title="드라이브에서 최신 데이터 불러오기">🔄 새로고침</button>
+    <button class="hbtn" onclick="forceSaveToDrive()" title="현재 데이터를 드라이브에 강제 저장" style="background:rgba(255,200,0,0.25);border-color:rgba(255,200,0,0.5)">☁️ 저장</button>
+    <button class="hbtn tax" onclick="openModal('modal-tax')">💰 세금 가이드</button>
+    <button class="hbtn" onclick="exportData()">⬇ 백업</button>
+    <label class="hbtn">⬆ 불러오기<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+    <button class="hbtn" id="admin-btn" onclick="openAdminModal()" style="display:none;background:rgba(245,166,35,0.3);border-color:rgba(245,166,35,0.6)">👑 관리자</button>
+  </div>
+</div>
+
+<div class="breadcrumb" id="breadcrumb">
+  <span class="cur" onclick="goLevel(0)">📍 전체 구역</span>
+</div>
+
+<!-- 메인 탭 -->
+<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;gap:0">
+  <button id="tab-gu" onclick="switchTab('gu')"
+    style="padding:10px 20px;font-size:13px;font-weight:600;font-family:var(--sans);background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer">
+    🏘 구역 관리
+  </button>
+  <button id="tab-plan" onclick="switchTab('plan')"
+    style="padding:10px 20px;font-size:13px;font-weight:500;font-family:var(--sans);background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);cursor:pointer">
+    📅 임장 플래너
+  </button>
+</div>
+
+<div class="container">
+
+  <!-- 임장 플래너 뷰 -->
+  <div id="view-plan" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="date" id="plan-date" onchange="renderPlan()"
+          style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans);color:var(--text);background:var(--surface)">
+        <span id="plan-summary" style="font-size:12px;color:var(--text3)"></span>
+      </div>
+      <button onclick="openAddPlanItem()"
+        style="padding:7px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">
+        + 물건 추가
+      </button>
+    </div>
+    <div id="plan-list"></div>
+    <div id="plan-empty" style="display:none;text-align:center;padding:48px 0;color:var(--text3)">
+      <div style="font-size:32px;margin-bottom:12px">📅</div>
+      <div style="font-size:14px;margin-bottom:6px">이날 임장 계획이 없어요</div>
+      <div style="font-size:12px">위 "+ 물건 추가" 버튼으로 임장할 물건을 추가하세요</div>
+    </div>
+  </div>
+
+  <!-- 1단계: 구 목록 -->
+  <div id="view-gu">
+    <!-- 업데이트 공지 -->
+    <div class="notice-box" id="notice-box">
+      <div class="notice-box-header">
+        <span class="notice-box-title">📢 업데이트 / 공지사항</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="notice-edit-btn" onclick="openNoticeModal()" style="display:none;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ 관리</button>
+          <button onclick="document.getElementById('notice-box').style.display='none'"
+            style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:0">✕</button>
+        </div>
+      </div>
+      <div id="notice-content"></div>
+    </div>
+    <!-- 낙찰기일 임박 섹션 -->
+    <div id="bid-alert-section" style="display:none;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:700;color:var(--text)">⚖️ 낙찰기일 임박 경매</span>
+        <span id="bid-alert-count" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div id="bid-alert-list"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text3)" id="gu-count"></div>
+    </div>
+    <div class="gu-grid" id="gu-grid"></div>
+    <button class="add-card" onclick="openModal('modal-add-gu')">+ 새 구역 추가</button>
+  </div>
+
+  <!-- 2단계: 물건 목록 -->
+  <div id="view-prop" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text3)" id="prop-count"></div>
+      <button class="btn btn-primary" onclick="openModal('modal-add-prop')" style="font-size:12px;padding:7px 14px">+ 물건 추가</button>
+    </div>
+    <div id="prop-list"></div>
+  </div>
+
+  <!-- 3단계: 물건 상세 -->
+  <div id="view-detail" style="display:none">
+    <div class="area-box">
+      <div class="area-box-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span>📍 지역 개요</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span id="detail-addr-text" style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.85)"></span>
+          <button onclick="copyDetailAddr()" style="padding:3px 8px;background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;font-size:11px;font-family:var(--sans);cursor:pointer">📋 복사</button>
+          <a id="detail-link-naver" href="#" target="_blank" style="padding:3px 8px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🗺 네이버</a>
+          <a id="detail-link-naver-land" href="#" target="_blank" style="padding:3px 8px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🏠 부동산</a>
+          <a id="detail-link-jaegebal" href="https://jaegebal.com" target="_blank" style="padding:3px 8px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🏗 재개발닷컴</a>
+        </div>
+      </div>
+      <div class="area-box-body">
+
+        <!-- 지도 영역 (좌: 카카오맵 / 우: 구획도) -->
+        <div class="map-section">
+          <!-- 왼쪽: 카카오맵 위치 -->
+          <div class="map-panel">
+            <div class="map-panel-header">
+              <span>🗺 대략적 위치</span>
+              <button onclick="openMap()">카카오맵 열기 ↗</button>
+            </div>
+            <div id="kakao-map" style="width:100%;height:180px;border-radius:8px;background:var(--surface2)"></div>
+          </div>
+          <!-- 오른쪽: 구획도 -->
+          <div class="map-panel">
+            <div class="map-panel-header">
+              <span>✏️ 구획도</span>
+              <div style="display:flex;gap:4px">
+                <label style="font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--accent);background:var(--accent-light);color:var(--accent);cursor:pointer;font-family:var(--sans);font-weight:600">
+                  📁 업로드
+                  <input type="file" accept="image/*" style="display:none" onchange="uploadZoneMap(event)">
+                </label>
+                <button onclick="clearZoneMap()" id="zone-map-del" style="display:none;color:var(--danger);border-color:var(--danger)">삭제</button>
+              </div>
+            </div>
+            <div class="map-zone-area">
+              <!-- 이미지 있을 때 -->
+              <img id="zone-map-img" class="map-zone-img" style="display:none"
+                onclick="openZoneLightbox()"
+                title="클릭하면 크게 봅니다">
+              <!-- 이미지 없을 때 -->
+              <label class="map-zone-empty" id="zone-map-empty">
+                <div style="font-size:26px">🗺</div>
+                <div style="font-weight:500">구획도 이미지 업로드</div>
+                <div style="font-size:11px">네이버지도·카카오맵 캡처, 손으로 그린 사진 등</div>
+                <input type="file" accept="image/*" style="display:none" onchange="uploadZoneMap(event)">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 구획도 라이트박스 -->
+        <div class="img-lightbox" id="zone-lightbox" onclick="closeZoneLightbox()">
+          <button class="img-lightbox-close" onclick="closeZoneLightbox()">✕</button>
+          <img id="zone-lightbox-img" src="" alt="구획도">
+        </div>
+
+<!-- 방문 사진 라이트박스 -->
+<div class="img-lightbox" id="photo-lightbox" onclick="if(event.target===this)closePhotoLightbox()">
+  <button class="img-lightbox-close" onclick="closePhotoLightbox()">✕</button>
+  <img id="lb-img" src="" alt="임장 사진" style="max-width:92vw;max-height:80vh;object-fit:contain;border-radius:8px">
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <button onclick="lbNav(-1)" style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:16px;cursor:pointer">◀</button>
+    <span id="lb-info" style="color:rgba(255,255,255,0.6);font-size:12px;align-self:center"></span>
+    <button onclick="lbNav(1)" style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:16px;cursor:pointer">▶</button>
+  </div>
+</div>
+
+        <!-- 진행단계 스텝퍼 -->
+        <div class="stage-stepper">
+          <div class="stage-stepper-title">📋 사업 진행단계</div>
+          <div class="stage-groups" id="stage-groups"></div>
+        </div>
+
+        <!-- 호재/특징 -->
+        <div class="info-grid">
+          <div class="info-box">
+            <div class="info-box-title">📈 호재 / 개발 이슈</div>
+            <textarea id="area-good" placeholder="예) GTX-C 인접&#10;망우역 복합환승센터 예정" oninput="saveAreaInfo()"></textarea>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">🏘 구역 특징</div>
+            <textarea id="area-feature" placeholder="예) 노후 빌라 밀집&#10;면목역 도보 12분" oninput="saveAreaInfo()"></textarea>
+          </div>
+        </div>
+
+        <!-- 시세 -->
+        <div class="sec-t">💰 주변 시세 현황 (만원)</div>
+        <div class="price-row">
+          <div class="price-item"><div class="pl">매매 실거래가</div><input type="number" id="area-price-trade" placeholder="17500" oninput="saveAreaInfo()"></div>
+          <div class="price-item"><div class="pl">전세 실거래가</div><input type="number" id="area-price-jeonse" placeholder="12000" oninput="saveAreaInfo()"></div>
+          <div class="price-item"><div class="pl">매물 호가 범위</div><input type="text" id="area-price-ask" placeholder="1.6억~1.9억" oninput="saveAreaInfo()" style="font-size:13px;font-weight:700;font-family:var(--mono)"></div>
+        </div>
+
+        <!-- 매물 현황 -->
+        <div class="sec-t">🔍 인터넷 매물 현황</div>
+        <textarea id="area-listings" rows="2" placeholder="예) 네이버 기준 8건 / 매매 6건 (1.6~1.9억) / 전세 2건 (1.1~1.3억)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:12px;font-family:var(--sans);resize:vertical;outline:none;line-height:1.6" oninput="saveAreaInfo()"></textarea>
+      </div>
+    </div>
+
+    <!-- 방문 기록 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:700">방문 기록</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary" onclick="openAddVisit('일반')" style="font-size:12px;padding:6px 12px">🏠 일반</button>
+        <button class="btn" onclick="openAddVisit('경매')" style="font-size:12px;padding:6px 12px;background:var(--warn-light);color:var(--warn);border:1px solid #f0c878">⚖️ 경매</button>
+      </div>
+    </div>
+    <div class="visit-timeline" id="visit-timeline"></div>
+  </div>
+
+</div>
+
+<!-- 구 추가 모달 -->
+<div class="modal-overlay" id="modal-add-gu">
+  <div class="modal">
+    <h3>📍 새 구역 추가</h3>
+    <div class="field"><label>구 이름</label><input type="text" id="new-gu-name" placeholder="예) 중랑구"></div>
+    <div class="field"><label>메모</label><input type="text" id="new-gu-memo" placeholder="예) 모아타운 집중 조사"></div>
+    <div class="btn-row" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-gu')">취소</button>
+      <button class="btn btn-primary" onclick="addGu()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 물건 추가 모달 -->
+<div class="modal-overlay" id="modal-add-prop">
+  <div class="modal">
+    <h3>🏠 새 물건 추가</h3>
+    <div class="field"><label>주소</label><input type="text" id="new-prop-addr" placeholder="예) 개봉동 308-2"></div>
+    <div class="field"><label>사업 유형</label>
+      <select id="new-prop-dtype">
+        <option>모아타운</option><option>신통기획</option><option>일반재개발</option><option>재건축</option><option>소규모재건축</option>
+      </select>
+    </div>
+    <div class="btn-row" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-prop')">취소</button>
+      <button class="btn btn-primary" onclick="addProp()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 물건 수정 모달 -->
+<div class="modal-overlay" id="modal-edit-prop">
+  <div class="modal">
+    <h3>✏️ 물건 수정</h3>
+    <input type="hidden" id="edit-prop-id">
+    <div class="field"><label>주소</label><input type="text" id="edit-prop-addr" placeholder="예) 개봉동 308-2"></div>
+    <div class="field"><label>사업 유형</label>
+      <select id="edit-prop-dtype">
+        <option>모아타운</option><option>신통기획</option><option>일반재개발</option><option>재건축</option><option>소규모재건축</option>
+      </select>
+    </div>
+    <div class="btn-row" style="justify-content:space-between">
+      <button class="btn" onclick="deleteProp()" style="background:var(--danger-light);color:var(--danger);border:1px solid #f0c8c8">🗑 물건 삭제</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-edit-prop')">취소</button>
+        <button class="btn btn-primary" onclick="saveEditProp()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 방문 추가 모달 -->
+<div class="modal-overlay" id="modal-add-visit">
+  <div class="modal">
+    <h3 id="visit-modal-title">🏠 방문 기록 추가</h3>
+    <!-- 물건 주소 입력 + 복사 + 사이트 버튼 -->
+    <div class="field" style="margin-bottom:10px">
+      <label>물건 주소</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input type="text" id="v-prop-addr" placeholder="예) 신월동 606-21"
+          oninput="updateVisitLinks('v')"
+          style="flex:1;padding:8px 12px;border:1.5px solid var(--accent);border-radius:8px;font-size:13px;font-family:var(--sans);font-weight:600;color:var(--accent)">
+        <button onclick="copyAddr('v-prop-addr')" style="padding:0 12px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);cursor:pointer;white-space:nowrap">📋 복사</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <a id="v-link-naver" href="#" target="_blank" style="padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🗺 네이버 지도</a>
+        <a id="v-link-land" href="https://land.naver.com" target="_blank" style="padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🏠 네이버 부동산</a>
+        <a href="https://jaegebal.com" target="_blank" style="padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🏗 재개발닷컴</a>
+      </div>
+    </div>
+    <input type="hidden" id="visit-mode" value="일반">
+    <div class="field"><label>방문일</label><input type="date" id="v-date"></div>
+    <div id="v-normal-type" class="field"><label>매물유형</label>
+      <select id="v-dealtype"><option>일반매물</option><option>급매</option><option>직거래</option></select>
+    </div>
+    <!-- 경매 전용 -->
+    <div id="v-auction-fields" style="display:none;background:var(--warn-light);border:1px solid #f0c878;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">⚖️ 경매 정보</div>
+      <div class="field"><label>사건번호</label><input type="text" id="v-case" placeholder="예) 2025타경11891"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field"><label>감정가 (만원)</label><input type="number" id="v-appraise"></div>
+        <div class="field"><label>최저입찰가 (만원)</label><input type="number" id="v-min-bid"></div>
+        <div class="field"><label>말소기준일</label><input type="date" id="v-erasure"></div>
+        <div class="field"><label>배당종기일</label><input type="date" id="v-dividend"></div>
+        <div class="field"><label>🔔 낙찰기일 (입찰일)</label><input type="date" id="v-bid-date"></div>
+        <div class="field"><label>내 입찰가 (만원)</label><input type="number" id="v-my-bid" placeholder="입찰 예정가"></div>
+      </div>
+      <div class="field"><label>대항력</label>
+        <select id="v-resist"><option>없음</option><option>있음-배당소멸</option><option>있음-낙찰자인수</option><option>미확인</option></select>
+      </div>
+      <div class="field"><label>HUG 포기물건</label>
+        <select id="v-hug"><option>해당없음</option><option>HUG 포기물건</option><option>미확인</option></select>
+      </div>
+      <!-- 낙찰 결과 -->
+      <div style="border-top:1px dashed #f0c878;margin-top:10px;padding-top:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">🏆 낙찰 결과 (입찰 후 기록)</div>
+        <div class="field"><label>결과</label>
+          <select id="v-bid-result">
+            <option value="">미정 (입찰 전)</option>
+            <option value="win">✅ 낙찰 (본인)</option>
+            <option value="lose">🏆 낙찰 (타인)</option>
+            <option value="cancel">↩️ 유찰</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="field"><label>실제 낙찰가 (만원)</label><input type="number" id="v-win-price" placeholder="타인 낙찰 시 기록"></div>
+          <div class="field"><label>낙찰율 (%)</label><input type="text" id="v-win-rate" placeholder="자동계산" readonly style="background:var(--surface2);color:var(--info);font-weight:700;font-family:var(--mono)"></div>
+        </div>
+        <div class="field"><label>결과 메모</label><input type="text" id="v-bid-memo" placeholder="예) 2등과 차이 500만원, 다음엔 더 써야할듯"></div>
+      </div>
+    </div>
+    <!-- 공통 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="field"><label>매매가 (만원)</label><input type="number" id="v-price" oninput="calcGap()"></div>
+      <div class="field"><label>전세가 (만원)</label><input type="number" id="v-jeonse" oninput="calcGap()"></div>
+      <div class="field"><label>공시가격 (만원)</label><input type="number" id="v-pub"></div>
+      <div class="field"><label>갭 🔵</label><input type="text" id="v-gap" readonly style="background:var(--info-light);color:var(--info);font-weight:700;font-family:var(--mono)"></div>
+    </div>
+    <div class="field"><label>투자 판단</label>
+      <select id="v-judge"><option value="">미정</option><option value="pass">⭕ 추가검토</option><option value="hold">🔺 보류</option><option value="fail">❌ 패스</option></select>
+    </div>
+    <div class="field"><label>총평 / 메모</label>
+      <textarea id="v-memo" rows="3" placeholder="방문 소감, 특이사항 등"></textarea>
+    </div>
+
+    <!-- 사진 업로드 -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">📷 임장 사진 (최대 5장 · 자동 압축)</div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text3);transition:all 0.15s;background:var(--surface2);"
+        id="v-photo-label"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+        📁 클릭해서 사진 추가
+        <input type="file" accept="image/*" multiple style="display:none" onchange="handleVisitPhotos(event)">
+      </label>
+      <div id="v-photo-preview" style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px"></div>
+    </div>
+
+    <div class="btn-row" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-visit')">취소</button>
+      <button class="btn btn-primary" onclick="addVisit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 방문 수정 모달 -->
+<div class="modal-overlay" id="modal-edit-visit">
+  <div class="modal">
+    <h3 id="edit-visit-modal-title">✏️ 방문 기록 수정</h3>
+    <!-- 물건 주소 입력 + 복사 + 사이트 버튼 -->
+    <div class="field" style="margin-bottom:10px">
+      <label>물건 주소</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input type="text" id="ev-prop-addr" placeholder="예) 신월동 606-21"
+          oninput="updateVisitLinks('ev')"
+          style="flex:1;padding:8px 12px;border:1.5px solid var(--accent);border-radius:8px;font-size:13px;font-family:var(--sans);font-weight:600;color:var(--accent)">
+        <button onclick="copyAddr('ev-prop-addr')" style="padding:0 12px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);cursor:pointer;white-space:nowrap">📋 복사</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <a id="ev-link-naver" href="#" target="_blank" style="padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🗺 네이버 지도</a>
+        <a id="ev-link-land" href="https://land.naver.com" target="_blank" style="padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🏠 네이버 부동산</a>
+        <a href="https://jaegebal.com" target="_blank" style="padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🏗 재개발닷컴</a>
+      </div>
+    </div>
+    <input type="hidden" id="edit-visit-id">
+    <input type="hidden" id="edit-visit-mode">
+    <div class="field"><label>방문일</label><input type="date" id="ev-date"></div>
+    <div id="ev-normal-type" class="field"><label>매물유형</label>
+      <select id="ev-dealtype"><option>일반매물</option><option>급매</option><option>직거래</option></select>
+    </div>
+    <!-- 경매 전용 -->
+    <div id="ev-auction-fields" style="display:none;background:var(--warn-light);border:1px solid #f0c878;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">⚖️ 경매 정보</div>
+      <div class="field"><label>사건번호</label><input type="text" id="ev-case" placeholder="예) 2025타경11891"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field"><label>감정가 (만원)</label><input type="number" id="ev-appraise"></div>
+        <div class="field"><label>최저입찰가 (만원)</label><input type="number" id="ev-min-bid"></div>
+        <div class="field"><label>말소기준일</label><input type="date" id="ev-erasure"></div>
+        <div class="field"><label>배당종기일</label><input type="date" id="ev-dividend"></div>
+        <div class="field"><label>🔔 낙찰기일 (입찰일)</label><input type="date" id="ev-bid-date"></div>
+        <div class="field"><label>내 입찰가 (만원)</label><input type="number" id="ev-my-bid" placeholder="입찰 예정가"></div>
+      </div>
+      <div class="field"><label>대항력</label>
+        <select id="ev-resist"><option>없음</option><option>있음-배당소멸</option><option>있음-낙찰자인수</option><option>미확인</option></select>
+      </div>
+      <div class="field"><label>HUG 포기물건</label>
+        <select id="ev-hug"><option>해당없음</option><option>HUG 포기물건</option><option>미확인</option></select>
+      </div>
+      <!-- 낙찰 결과 -->
+      <div style="border-top:1px dashed #f0c878;margin-top:10px;padding-top:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">🏆 낙찰 결과 (입찰 후 기록)</div>
+        <div class="field"><label>결과</label>
+          <select id="ev-bid-result">
+            <option value="">미정 (입찰 전)</option>
+            <option value="win">✅ 낙찰 (본인)</option>
+            <option value="lose">🏆 낙찰 (타인)</option>
+            <option value="cancel">↩️ 유찰</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="field"><label>실제 낙찰가 (만원)</label><input type="number" id="ev-win-price" placeholder="타인 낙찰 시 기록"></div>
+          <div class="field"><label>낙찰율 (%)</label><input type="text" id="ev-win-rate" placeholder="자동계산" readonly style="background:var(--surface2);color:var(--info);font-weight:700;font-family:var(--mono)"></div>
+        </div>
+        <div class="field"><label>결과 메모</label><input type="text" id="ev-bid-memo" placeholder="예) 2등과 차이 500만원, 다음엔 더 써야할듯"></div>
+      </div>
+    </div>
+    <!-- 공통 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="field"><label>매매가 (만원)</label><input type="number" id="ev-price" oninput="calcEditGap()"></div>
+      <div class="field"><label>전세가 (만원)</label><input type="number" id="ev-jeonse" oninput="calcEditGap()"></div>
+      <div class="field"><label>공시가격 (만원)</label><input type="number" id="ev-pub"></div>
+      <div class="field"><label>갭 🔵</label><input type="text" id="ev-gap" readonly style="background:var(--info-light);color:var(--info);font-weight:700;font-family:var(--mono)"></div>
+    </div>
+    <div class="field"><label>투자 판단</label>
+      <select id="ev-judge"><option value="">미정</option><option value="pass">⭕ 추가검토</option><option value="hold">🔺 보류</option><option value="fail">❌ 패스</option></select>
+    </div>
+    <div class="field"><label>총평 / 메모</label>
+      <textarea id="ev-memo" rows="3" placeholder="방문 소감, 특이사항 등"></textarea>
+    </div>
+
+    <!-- 기존 사진 목록 -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">📷 기존 사진 (✕ 클릭하면 삭제)</div>
+      <div id="ev-existing-photos" style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px"></div>
+      <!-- 사진 추가 -->
+      <label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--text3);background:var(--surface2);"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+        📁 사진 추가 (최대 5장)
+        <input type="file" accept="image/*" multiple style="display:none" onchange="handleEditVisitPhotos(event)">
+      </label>
+      <div id="ev-new-photo-preview" style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px"></div>
+    </div>
+
+    <div class="btn-row" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-visit')">취소</button>
+      <button class="btn btn-primary" onclick="saveEditVisit()">저장</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- 공지사항 관리 모달 (관리자 전용) -->
+<div class="modal-overlay" id="modal-notice">
+  <div class="modal" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">📢 공지사항 관리</h3>
+      <button onclick="closeModal('modal-notice')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+
+    <!-- 새 버전 추가 -->
+    <div style="background:var(--accent-light);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px">+ 새 업데이트 추가</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="field"><label>버전</label><input type="text" id="notice-new-ver" placeholder="예) v3.1"></div>
+        <div class="field"><label>날짜</label><input type="date" id="notice-new-date"></div>
+      </div>
+      <div class="field"><label>변경사항 (줄바꿈으로 구분)</label>
+        <textarea id="notice-new-items" rows="4" placeholder="카카오맵 지도 추가&#10;낙찰기일 D-day 표시&#10;임장 플래너 추가" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-family:var(--sans);resize:vertical"></textarea>
+      </div>
+      <button onclick="addNoticeVersion()" style="width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">추가</button>
+    </div>
+
+    <!-- 이력 목록 -->
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">📋 업데이트 이력</div>
+    <div id="notice-history-list" style="max-height:300px;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- 임장 플래너 물건 추가 모달 -->
+<div class="modal-overlay" id="modal-add-plan">
+  <div class="modal">
+    <h3>📅 임장 물건 추가</h3>
+    <div class="field"><label>구역 선택</label>
+      <select id="plan-gu-select" onchange="renderPlanPropSelect()" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans)">
+        <option value="">구역을 선택하세요</option>
+      </select>
+    </div>
+    <div class="field"><label>물건 선택</label>
+      <select id="plan-prop-select" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans)">
+        <option value="">물건을 선택하세요</option>
+      </select>
+    </div>
+    <div class="btn-row" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-plan')">취소</button>
+      <button class="btn btn-primary" onclick="addPlanItem()">추가</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-tax">
+  <div class="modal tax-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="margin:0">💰 세금 가이드 (2024년 기준)</h3>
+      <button class="btn btn-secondary" onclick="closeModal('modal-tax')" style="padding:5px 12px;font-size:12px">✕ 닫기</button>
+    </div>
+    <div class="tax-tab-row">
+      <button class="tax-tab active" onclick="switchTaxTab('acq')">취득세</button>
+      <button class="tax-tab" onclick="switchTaxTab('cgt')">양도소득세</button>
+      <button class="tax-tab" onclick="switchTaxTab('pos')">포지션별 비교</button>
+    </div>
+
+    <!-- 취득세 -->
+    <div class="tax-section active" id="tax-acq">
+      <table class="tax-table">
+        <thead><tr><th>포지션</th><th>조정지역</th><th>비조정지역</th><th>예외</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge g">무주택</span></td><td>6억↓ 1% · 6~9억 1~3% · 9억↑ 3%</td><td>동일</td><td>소형(60㎡↓) 1% · 1억↓ 1%</td></tr>
+          <tr><td><span class="badge y">1주택→2주택</span></td><td><span class="badge r">8% 중과</span></td><td>소형 1% · 일반 3%</td><td>농특세·지교세 별도</td></tr>
+          <tr><td><span class="badge y">2주택→3주택</span></td><td><span class="badge r">12% 중과</span></td><td><span class="badge r">8% 중과</span></td><td></td></tr>
+          <tr><td><span class="badge b">주임사</span></td><td>60㎡↓ <span class="badge g">1%</span> · 60㎡↑ <span class="badge r">8%</span></td><td>60㎡↓ 1% · 60㎡↑ 4%</td><td>감면요건 별도 확인</td></tr>
+          <tr><td><span class="badge r">법인</span></td><td colspan="2" style="text-align:center"><span class="badge r">12% 일괄 중과</span></td><td>농특세 1% 추가</td></tr>
+        </tbody>
+      </table>
+      <div class="tax-note">· 1주택자 조정지역 추가 매수 → 8% 중과 (실부담 약 9.4%)<br>· 비조정 + 1억 이하 + 소형 → 포지션 무관 1% 가능<br>· 법인 → 지역·면적 불문 12% 고정</div>
+    </div>
+
+    <!-- 양도소득세 -->
+    <div class="tax-section" id="tax-cgt">
+      <table class="tax-table">
+        <thead><tr><th>구분</th><th>세율</th><th>조건</th></tr></thead>
+        <tbody>
+          <tr><td>1년 미만 보유</td><td><span class="badge r">70%</span></td><td>포지션 무관 단기 중과</td></tr>
+          <tr><td>1~2년 보유</td><td><span class="badge r">60%</span></td><td>포지션 무관 단기 중과</td></tr>
+          <tr><td>2년+ · 1주택 비과세</td><td><span class="badge g">0%</span></td><td>실거주 2년 + 12억↓</td></tr>
+          <tr><td>2주택 · 조정지역</td><td><span class="badge r">기본+20%p</span></td><td>실거주 없을 경우</td></tr>
+          <tr><td>3주택+ · 조정지역</td><td><span class="badge r">기본+30%p</span></td><td></td></tr>
+          <tr><td>주임사 (의무임대 완료)</td><td><span class="badge g">중과 배제</span></td><td>장특공제 최대 70%</td></tr>
+          <tr><td>법인 주택 양도</td><td><span class="badge r">법인세+20%p</span></td><td>비과세 없음</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px;overflow-x:auto">
+        <table class="tax-table">
+          <thead><tr><th>과세표준</th><th>세율</th><th>지방소득세 포함</th></tr></thead>
+          <tbody>
+            <tr><td>1,400만↓</td><td>6%</td><td>6.6%</td></tr>
+            <tr><td>1,400~5,000만</td><td>15%</td><td>16.5%</td></tr>
+            <tr><td>5,000~8,800만</td><td>24%</td><td>26.4%</td></tr>
+            <tr><td>8,800~1.5억</td><td>35%</td><td>38.5%</td></tr>
+            <tr><td>1.5억~3억</td><td>38%</td><td>41.8%</td></tr>
+            <tr><td>3억~5억</td><td>40%</td><td>44.0%</td></tr>
+            <tr><td>5억↑</td><td>42%</td><td>46.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tax-note">· 2년 보유+실거주 2년 → 1주택 비과세(12억↓) 가장 강력<br>· 장기보유특별공제 → 1주택 실거주 시 최대 80%<br>· 기본공제 연 250만원</div>
+    </div>
+
+    <!-- 포지션별 -->
+    <div class="tax-section" id="tax-pos">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:var(--accent-light);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">🏠 무주택</div>
+          <div style="font-size:12px;line-height:1.8;color:var(--text2)">취득세 1~3% (소형 1%)<br>양도세 비과세 가능 (실거주 2년)<br>장특공제 최대 80%<br><strong style="color:var(--accent)">→ 취득·양도 모두 유리</strong></div>
+        </div>
+        <div style="background:var(--warn-light);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">🏠🏠 1주택자</div>
+          <div style="font-size:12px;line-height:1.8;color:var(--text2)">조정지역 취득세 8% 중과<br>비조정 소형 1% 가능<br>일시적 2주택 특례 활용<br><strong style="color:var(--warn)">→ 비조정 타겟 권장</strong></div>
+        </div>
+        <div style="background:var(--info-light);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--info);margin-bottom:8px">📋 주임사</div>
+          <div style="font-size:12px;line-height:1.8;color:var(--text2)">60㎡↓ 취득세 1% 감면<br>의무임대 10년 완료 후 중과 배제<br>장특공제 최대 70%<br><strong style="color:var(--info)">→ 소형 장기보유 전략</strong></div>
+        </div>
+        <div style="background:var(--danger-light);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:8px">🏢 법인</div>
+          <div style="font-size:12px;line-height:1.8;color:var(--text2)">취득세 12% 일괄 (실부담 13.4%)<br>양도세 법인세+20%p<br>1주택 비과세 미적용<br><strong style="color:var(--danger)">→ 주택 취득 현 세법상 불리</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 설정 ─────────────────────────────────────────────────────────
+const GOOGLE_CLIENT_ID = '411706579949-emphkmk3iil288v54209qfucp7uotfik.apps.googleusercontent.com';
+const ADMIN_EMAIL = 'yourkocs@gmail.com'; // 관리자 계정
+
+let currentUser = null; // { email, name, picture, status }
+
+// ── Google 로그인 초기화 ──────────────────────────────────────────
+function initGoogleLogin() {
+  if (typeof google === 'undefined') { setTimeout(initGoogleLogin, 300); return; }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse,
+    auto_select: false,
+    cancel_on_tap_outside: true,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('g_id_signin'),
+    { theme: 'outline', size: 'large', text: 'signin_with', locale: 'ko', width: 260 }
+  );
+}
+
+// ── 구글 로그인 콜백 ─────────────────────────────────────────────
+async function handleCredentialResponse(response) {
+  const payload = parseJwt(response.credential);
+  const email   = (payload.email || '').toLowerCase();
+  const name    = payload.name || '';
+  const picture = payload.picture || '';
+
+  // GAS에서 사용자 상태 조회
+  setStatus('🔍 계정 확인 중...', 'var(--info)');
+  try {
+    const res  = await fetch(GAS_URL + '?action=getUser&email=' + encodeURIComponent(email) + '&t=' + Date.now());
+    const json = await res.json();
+
+    if (json.status === 'approved' || email === ADMIN_EMAIL) {
+      // 승인된 사용자 또는 관리자
+      currentUser = { email, name: json.name || name, picture, status: 'approved' };
+      onLoginSuccess();
+    } else if (json.status === 'pending') {
+      // 승인 대기 중
+      currentUser = { email, name: json.name || name, picture, status: 'pending' };
+      showScreen('ls-pending');
+    } else {
+      // 미등록 → 회원가입 화면
+      currentUser = { email, name, picture, status: 'new' };
+      document.getElementById('ls-register-email').textContent = '📧 ' + email;
+      document.getElementById('register-name').value = name;
+      showScreen('ls-register');
+    }
+  } catch(e) {
+    setStatus('⚠️ 서버 연결 실패', 'var(--warn)');
+    console.error(e);
+  }
+}
+
+// ── 회원가입 제출 ─────────────────────────────────────────────────
+async function submitRegister() {
+  const name = document.getElementById('register-name').value.trim();
+  if (!name) { showRegisterError('이름을 입력해주세요'); return; }
+  const errEl = document.getElementById('register-error');
+  errEl.style.display = 'none';
+  try {
+    const res  = await fetch(GAS_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'registerUser', email: currentUser.email, name })
+    });
+    const json = await res.json();
+    if (json.ok) {
+      currentUser.name = name;
+      currentUser.status = 'pending';
+      showScreen('ls-pending');
+    } else {
+      showRegisterError(json.error || '가입 실패. 다시 시도해주세요.');
+    }
+  } catch(e) {
+    showRegisterError('서버 연결 실패. 다시 시도해주세요.');
+  }
+}
+
+function showRegisterError(msg) {
+  const el = document.getElementById('register-error');
+  el.textContent = '⚠️ ' + msg;
+  el.style.display = 'block';
+}
+
+// ── 로그인 성공 ───────────────────────────────────────────────────
+function onLoginSuccess() {
+  document.getElementById('login-screen').classList.remove('active');
+  const userEl = document.getElementById('header-user');
+  userEl.style.display = 'flex';
+  document.getElementById('header-avatar').src = currentUser.picture;
+  const displayName = currentUser.name && /[^\x00-\x7F]/.test(currentUser.name)
+    ? currentUser.name
+    : (currentUser.name || currentUser.email.split('@')[0]);
+  document.getElementById('header-name').textContent = displayName;
+  if (currentUser.email === ADMIN_EMAIL) {
+    document.getElementById('admin-btn').style.display = 'inline-block';
+    document.getElementById('notice-edit-btn').style.display = 'inline-block';
+  }
+  // 세션 저장 (새로고침 대비)
+  sessionStorage.setItem('jejeUser', JSON.stringify(currentUser));
+  loadFromDrive();
+}
+
+// ── 세션 복구 (새로고침 시) ───────────────────────────────────
+function tryRestoreSession() {
+  const saved = sessionStorage.getItem('jejeUser');
+  if (!saved) return false;
+  try {
+    currentUser = JSON.parse(saved);
+    if (!currentUser.email) return false;
+    document.getElementById('login-screen').classList.remove('active');
+    document.getElementById('header-user').style.display = 'flex';
+    document.getElementById('header-avatar').src = currentUser.picture || '';
+    document.getElementById('header-name').textContent = currentUser.name || currentUser.email.split('@')[0];
+    if (currentUser.email === ADMIN_EMAIL) {
+      document.getElementById('admin-btn').style.display = 'inline-block';
+      document.getElementById('notice-edit-btn').style.display = 'inline-block';
+    }
+    loadFromDrive();
+    return true;
+  } catch(e) { sessionStorage.removeItem('jejeUser'); return false; }
+}
+
+// ── 로그아웃 ─────────────────────────────────────────────────────
+function signOut() {
+  if (!confirm('로그아웃 하시겠습니까?')) return;
+  currentUser = null;
+  sessionStorage.removeItem('jejeUser');
+  google.accounts.id.disableAutoSelect();
+  document.getElementById('header-user').style.display = 'none';
+  document.getElementById('admin-btn').style.display = 'none';
+  document.getElementById('notice-edit-btn').style.display = 'none';
+  showScreen('ls-main');
+  document.getElementById('login-screen').classList.add('active');
+}
+
+// ── 로그인 화면 전환 ─────────────────────────────────────────────
+function showScreen(id) {
+  ['ls-main','ls-register','ls-pending'].forEach(s => {
+    document.getElementById(s).style.display = s === id ? 'block' : 'none';
+  });
+}
+
+// ── 관리자 모달 ───────────────────────────────────────────────────
+async function openAdminModal() {
+  openModal('modal-admin');
+  document.getElementById('admin-pending-list').innerHTML  = '불러오는 중...';
+  document.getElementById('admin-approved-list').innerHTML = '불러오는 중...';
+  try {
+    const res   = await fetch(GAS_URL + '?action=getUsers&t=' + Date.now());
+    const users = await res.json();
+    const pending  = users.filter(u => u.status === 'pending');
+    const approved = users.filter(u => u.status === 'approved');
+
+    document.getElementById('admin-pending-list').innerHTML = pending.length
+      ? pending.map(u => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--warn-light);border-radius:8px;margin-bottom:6px">
+            <div><div style="font-weight:600">${u.name}</div><div style="color:var(--text3);font-size:11px">${u.email}</div></div>
+            <div style="display:flex;gap:6px">
+              <button onclick="approveUser('${u.email}')" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--sans)">✅ 승인</button>
+              <button onclick="rejectUser('${u.email}')"  style="padding:4px 10px;background:var(--danger-light);color:var(--danger);border:1px solid #f0c8c8;border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--sans)">❌ 거절</button>
+            </div>
+          </div>`).join('')
+      : '<div style="color:var(--text3);padding:6px">대기 중인 회원 없음</div>';
+
+    document.getElementById('admin-approved-list').innerHTML = approved.length
+      ? approved.map(u => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--accent-light);border-radius:8px;margin-bottom:5px">
+            <div><span style="font-weight:600">${u.name}</span> <span style="color:var(--text3);font-size:11px">${u.email}</span></div>
+            <button onclick="revokeUser('${u.email}')" style="padding:3px 8px;background:#fff;color:var(--danger);border:1px solid #f0c8c8;border-radius:6px;font-size:10px;cursor:pointer;font-family:var(--sans)">취소</button>
+          </div>`).join('')
+      : '<div style="color:var(--text3);padding:6px">승인된 회원 없음</div>';
+  } catch(e) {
+    document.getElementById('admin-pending-list').textContent = '불러오기 실패';
+  }
+}
+
+async function approveUser(email) {
+  await updateUserStatus(email, 'approved');
+  openAdminModal();
+}
+async function rejectUser(email) {
+  if (!confirm(email + ' 을 거절할까요?')) return;
+  await updateUserStatus(email, 'rejected');
+  openAdminModal();
+}
+async function revokeUser(email) {
+  if (!confirm(email + ' 의 승인을 취소할까요?')) return;
+  await updateUserStatus(email, 'pending');
+  openAdminModal();
+}
+async function updateUserStatus(email, status) {
+  await fetch(GAS_URL, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'updateUser', email, status })
+  });
+}
+
+// ── JWT 파싱 (한글 이름 깨짐 방지) ──────────────────────────────
+function parseJwt(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const jsonStr = decodeURIComponent(
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    return JSON.parse(jsonStr);
+  } catch(e) { return {}; }
+}
+
+window.addEventListener('load', () => {
+  if (!tryRestoreSession()) initGoogleLogin();
+});
+
+
+const STAGE_GROUPS = [
+  {
+    label: '초기 단계', color: 'default',
+    steps: ['대상지 선정 전 (자체 발굴)', '후보지 검토 중', '대상지 선정 (후보지 발표)']
+  },
+  {
+    label: '주민 동의 단계', color: 'default',
+    steps: ['주민설명회', '주민동의 진행 중 (50% 미만)', '주민동의 진행 중 (50% 이상)', '주민동의 완료 (2/3 이상)']
+  },
+  {
+    label: '추진위 단계', color: 'default',
+    steps: ['추진위 구성 중', '추진위 승인 완료']
+  },
+  {
+    label: '정비계획 단계', color: 'warn',
+    steps: ['정비계획 수립 중', '정비계획 열람·공람', '정비구역 지정 신청', '정비구역 지정 완료']
+  },
+  {
+    label: '조합 설립 단계', color: 'warn',
+    steps: ['조합설립 동의 진행 중', '조합설립인가 신청', '조합설립인가 완료']
+  },
+  {
+    label: '사업 진행 단계', color: 'done',
+    steps: ['사업시행인가', '관리처분인가', '이주·철거', '착공', '준공·입주']
+  }
+];
+
+
+let data = { gus: [], plans: [], notices: [] };
+let curGu = null, curProp = null;
+let saveTimer = null;
+
+// 로컬 먼저 로드
+try { const s = localStorage.getItem('redev_v2'); if(s) data = JSON.parse(s); } catch(e){}
+
+// 로컬이 비어있을 때만 샘플 데이터 삽입 (드라이브에서 받아오면 덮어씀)
+if (!data.gus.length) {
+  data.gus = [
+    {
+      id: 9001,
+      name: '양천구',
+      memo: '2026.04.24 임장 — 신월·화곡·신정 모아타운',
+      props: [
+        {
+          id: 9101,
+          addr: '신월동 480-16',
+          dtype: '모아타운',
+          stage: '주민동의 진행 중 (50% 이상)',
+          area: { good: '', feature: '', priceT: 0, priceJ: 0, priceAsk: '', listings: '' },
+          visits: [{
+            id: 9101001, date: '2026-04-24', mode: '일반', dealtype: '낙찰',
+            price: 11900, jeonse: 17640, pub: 14000, gap: -5740, judge: 'pass',
+            memo: '구청 통화 시 임의집단 추진 중. 아파트 주민동의 50% 취득, 주민설명회 앞두고 있음. 5월경 구청 신고 후 관리계획 수립 예정. 추진위 010-6755-7130 (하나부동산)\n\n주변 초중 가까움, 버스정류장 도보 5분 이내, 이마트24·하나마트 인근',
+            photos: [], auction: {}
+          }]
+        },
+        {
+          id: 9102,
+          addr: '신월동 103-5 보노하우스',
+          dtype: '모아타운',
+          stage: '조합설립 동의 진행 중',
+          area: { good: '', feature: '21.6 준공 / 주변 최고층', priceT: 0, priceJ: 0, priceAsk: '', listings: '' },
+          visits: [{
+            id: 9102001, date: '2026-04-24', mode: '일반', dealtype: '낙찰',
+            price: 18000, jeonse: 21420, pub: 17000, gap: -3420, judge: 'pass',
+            memo: '주변 높은 건물 없음, 제일 고층이라 누수 고민\n엘리베이터 없음 / 주차 9대',
+            photos: [], auction: {}
+          }]
+        },
+        {
+          id: 9103,
+          addr: '신월동 606-21',
+          dtype: '재건축',
+          stage: '사업시행인가',
+          area: { good: '하이엔드 아파트 건설 예정', feature: '', priceT: 0, priceJ: 0, priceAsk: '', listings: '' },
+          visits: [{
+            id: 9103001, date: '2026-04-24', mode: '일반', dealtype: '일반매물',
+            price: 23500, jeonse: 28854, pub: 22900, gap: -5354, judge: '',
+            memo: '2009년 사업시행인가, 17년 경과 진척 없음. 반대세력 있는 것으로 추정',
+            photos: [], auction: {}
+          }]
+        },
+        {
+          id: 9104,
+          addr: '신정동 933-9 신통 경매',
+          dtype: '모아타운',
+          stage: '추진위 승인 완료',
+          area: { good: '', feature: '', priceT: 0, priceJ: 0, priceAsk: '', listings: '' },
+          visits: [{
+            id: 9104001, date: '2026-04-24', mode: '일반', dealtype: '일반매물',
+            price: 28000, jeonse: 18900, pub: 15000, gap: 9100, judge: '',
+            memo: '',
+            photos: [], auction: {}
+          }]
+        },
+        {
+          id: 9105,
+          addr: '화곡동 1088-6 씨티하우스',
+          dtype: '모아타운',
+          stage: '조합설립 동의 진행 중',
+          area: { good: '', feature: '21.6 준공', priceT: 0, priceJ: 0, priceAsk: '', listings: '' },
+          visits: [{
+            id: 9105001, date: '2026-04-24', mode: '일반', dealtype: '낙찰',
+            price: 18700, jeonse: 23562, pub: 18700, gap: -4862, judge: 'pass',
+            memo: '주변 초중 가까움, 버스정류장 도보 5분 이내, 이마트24·하나마트 인근\n엘리베이터 없음 / 주차 9대 / 302호',
+            photos: [], auction: {}
+          }]
+        }
+      ]
+    },
+    {
+      id: 9002,
+      name: '구로구',
+      memo: '2026.04.24 임장 — 개봉동 모아타운',
+      props: [
+        {
+          id: 9201,
+          addr: '개봉동 308-2',
+          dtype: '모아타운',
+          stage: '추진위 승인 완료',
+          area: { good: '', feature: '', priceT: 0, priceJ: 0, priceAsk: '', listings: '' },
+          visits: [{
+            id: 9201001, date: '2026-04-24', mode: '일반', dealtype: '일반매물',
+            price: 25700, jeonse: 27846, pub: 22100, gap: -2146, judge: '',
+            memo: '3층 / 엘리베이터 없음 / 주차 4대',
+            photos: [], auction: {}
+          }]
+        }
+      ]
+    }
+  ];
+  // 로컬에만 저장 (시트에는 올리지 않음 — 시트 기존 데이터 보호)
+  try { localStorage.setItem('redev_v2', JSON.stringify(data)); } catch(e){}
+}
+
+// ── Google Drive 연동 ────────────────────────────────────────────
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzMv5d-MDm5nWJ1Bu-K1d-489d0qs1VPeqFAaoccQr5zbxymTWLDLj2RxlcrdxPQO4G/exec';
+
+// 저장 상태 표시
+function setStatus(msg, color='var(--text3)') {
+  const el = document.getElementById('sync-status');
+  if (el) { el.textContent = msg; el.style.color = color; }
+}
+
+// ── 드라이브에서 데이터 불러오기 ──────────────────────────────────
+async function loadFromDrive() {
+  setStatus('☁️ 드라이브 불러오는 중...', 'var(--info)');
+  try {
+    const res = await fetch(GAS_URL + '?action=load&t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (json && json.gus && json.gus.length > 0) {
+      data = json;
+      try { localStorage.setItem('redev_v2', JSON.stringify(data)); } catch(e){}
+      setStatus('✅ 드라이브 데이터 로드 완료', 'rgba(150,220,255,0.95)');
+      goLevel(0);
+      renderNotices();
+      checkBidDateAlerts();
+    } else {
+      setStatus('⚠️ 드라이브 데이터 없음 — 로컬 사용 중', 'var(--warn)');
+    }
+  } catch(e) {
+    setStatus('📴 오프라인 — 로컬 데이터 사용 중', 'var(--text3)');
+    console.warn('Drive 연결 실패:', e);
+  }
+}
+
+// ── 드라이브에 저장 (base64 이미지 포함 JSON 통째로) ─────────────────
+async function saveToDrive() {
+  setStatus('☁️ 저장 중...', 'var(--info)');
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      redirect: 'follow',
+      body: JSON.stringify({ action: 'save', data: data })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setStatus('✅ ' + new Date().toLocaleTimeString('ko-KR') + ' 드라이브 저장됨', 'rgba(150,220,255,0.95)');
+  } catch(e) {
+    console.error('saveToDrive 실패:', e);
+    setStatus('⚠️ 드라이브 저장 실패 (로컬만 저장) — ' + e.message, 'var(--warn)');
+  }
+}
+
+// ── 강제 저장 버튼 ───────────────────────────────────────────────
+async function forceSaveToDrive() {
+  if (!confirm('현재 데이터를 구글 드라이브에 저장할까요?\n(기존 드라이브 파일을 덮어씁니다)')) return;
+  setStatus('☁️ 드라이브 저장 중...', 'var(--info)');
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      redirect: 'follow',
+      body: JSON.stringify({ action: 'save', data: data })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    let resultMsg = '';
+    try { const j = await res.clone().json(); if (j.error) resultMsg = '\n⚠️ GAS 오류: ' + j.error; } catch(e2){}
+    setStatus('✅ 드라이브 저장 완료 — ' + new Date().toLocaleTimeString('ko-KR'), 'rgba(150,220,255,0.95)');
+    alert('✅ 구글 드라이브 저장 완료!\n📁 폴더: JEJERECORD\n📄 파일: data.json' + resultMsg);
+  } catch(e) {
+    console.error('forceSaveToDrive 실패:', e);
+    setStatus('⚠️ 드라이브 저장 실패 — ' + e.message, 'var(--warn)');
+    alert('저장 실패: ' + e.message + '\n\nF12 콘솔에서 자세한 오류를 확인하세요.');
+  }
+}
+
+
+// 저장 — 로컬 즉시 + 클라우드 1초 디바운스
+function saveData() {
+  try { localStorage.setItem('redev_v2', JSON.stringify(data)); } catch(e){}
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveToDrive(), 1500); // 1.5초 디바운스 후 드라이브 자동저장
+}
+function fmt(v) { return v ? Math.round(v).toLocaleString('ko-KR') : '-'; }
+function genId() { return Date.now() + Math.random(); }
+function judgeLabel(j) { return j==='pass'?'⭕ 추가검토':j==='hold'?'🔺 보류':j==='fail'?'❌ 패스':'미정'; }
+function judgeClass(j) { return j==='pass'?'g':j==='hold'?'y':j==='fail'?'r':'n'; }
+
+// ── 네비게이션 ────────────────────────────────────────────────────
+function goLevel(lv, guId, propId) {
+  ['view-gu','view-prop','view-detail'].forEach((id,i) =>
+    document.getElementById(id).style.display = i===lv?'block':'none'
+  );
+  const bc = document.getElementById('breadcrumb');
+  if (lv===0) {
+    curGu=null; curProp=null;
+    bc.innerHTML = `<span class="cur">📍 전체 구역</span>`;
+    renderGu();
+    renderNotices();
+  } else if (lv===1) {
+    curGu = data.gus.find(g=>g.id===guId);
+    bc.innerHTML = `<span onclick="goLevel(0)">📍 전체 구역</span><span class="sep">›</span><span class="cur">📍 ${curGu.name}</span>`;
+    renderProps();
+  } else {
+    curGu = data.gus.find(g=>g.id===guId);
+    curProp = curGu.props.find(p=>p.id===propId);
+    bc.innerHTML = `<span onclick="goLevel(0)">📍 전체 구역</span><span class="sep">›</span><span onclick="goLevel(1,${curGu.id})">📍 ${curGu.name}</span><span class="sep">›</span><span class="cur">🏠 ${curProp.addr}</span>`;
+    renderDetail();
+  }
+}
+
+// ── 1단계 ────────────────────────────────────────────────────────
+function renderGu() {
+  const grid = document.getElementById('gu-grid');
+  const tp = data.gus.reduce((s,g)=>s+g.props.length,0);
+  document.getElementById('gu-count').textContent = `구역 ${data.gus.length}개 · 물건 ${tp}건`;
+  grid.innerHTML = data.gus.map(g => {
+    const tv = g.props.reduce((s,p)=>s+p.visits.length,0);
+    return `<div class="gu-card" onclick="goLevel(1,${g.id})">
+      <div class="gu-icon">📍</div>
+      <div class="gu-name">${g.name}</div>
+      <div class="gu-meta">${g.memo||''}</div>
+      <div class="gu-stats">
+        <span class="gu-stat">물건 ${g.props.length}</span>
+        <span class="gu-stat">방문 ${tv}회</span>
+      </div>
+    </div>`;
+  }).join('');
+  checkBidDateAlerts();
+}
+
+// ── 2단계 ────────────────────────────────────────────────────────
+function renderProps() {
+  const list = document.getElementById('prop-list');
+  document.getElementById('prop-count').textContent = `${curGu.name} · 물건 ${curGu.props.length}건`;
+  list.innerHTML = curGu.props.map(p => {
+    const lv = p.visits[p.visits.length-1];
+    const jd = lv?.judge||'';
+    const asilUrl = `https://map.naver.com/v5/search/${encodeURIComponent(curGu.name + ' ' + p.addr)}`;
+    return `<div class="prop-card" onclick="goLevel(2,${curGu.id},${p.id})">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap">
+          <div class="prop-addr">${p.addr}</div>
+          <button onclick="event.stopPropagation();openEditProp('${p.id}')"
+            style="background:var(--info-light);color:var(--info);border:1px solid #c5d4f0;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);white-space:nowrap">✏️ 수정</button>
+          <a href="${asilUrl}" target="_blank" onclick="event.stopPropagation()"
+            style="background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🗺 네이버</a>
+        </div>
+        <div class="prop-meta">${p.dtype} · ${p.stage}</div>
+        <div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap">
+          <span class="badge b">방문 ${p.visits.length}회</span>
+          ${lv?`<span class="badge ${judgeClass(jd)}">${judgeLabel(jd)}</span>`:''}
+          ${lv?`<span class="badge n">${lv.date}</span>`:''}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="prop-visits">${p.visits.length}</div>
+        <div class="prop-visits-label">방문</div>
+        ${lv?.price?`<div style="font-size:12px;font-weight:600;font-family:var(--mono);margin-top:4px">${fmt(lv.price)}만</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  list.innerHTML += `<button class="add-card" onclick="openModal('modal-add-prop')">+ 물건 추가</button>`;
+}
+
+// ── 3단계 ────────────────────────────────────────────────────────
+function renderDetail() {
+  const a = curProp.area || {};
+
+  // 상단 주소 + 링크 업데이트
+  const addrText = document.getElementById('detail-addr-text');
+  const naverLink = document.getElementById('detail-link-naver');
+  const naverLandLink = document.getElementById('detail-link-naver-land');
+  const fullAddr = curGu.name + ' ' + curProp.addr;
+  if (addrText) addrText.textContent = fullAddr;
+  if (naverLink) naverLink.href = `https://map.naver.com/v5/search/${encodeURIComponent(fullAddr)}`;
+
+  document.getElementById('area-good').value = a.good||'';
+  document.getElementById('area-feature').value = a.feature||'';
+  document.getElementById('area-price-trade').value = a.priceT||'';
+  document.getElementById('area-price-jeonse').value = a.priceJ||'';
+  document.getElementById('area-price-ask').value = a.priceAsk||'';
+  document.getElementById('area-listings').value = a.listings||'';
+  updateMapLink();
+  renderZoneMap();
+  renderStageGroups();
+  renderVisits();
+}
+
+// 진행단계 스텝퍼 렌더링
+function renderStageGroups() {
+  const container = document.getElementById('stage-groups');
+  const curStage = curProp.stage || '';
+
+  // 현재 단계 표시
+  const curGroupLabel = curStage
+    ? STAGE_GROUPS.find(g => g.steps.includes(curStage))?.label || ''
+    : '';
+
+  container.innerHTML = `
+    <div class="stage-current-display">
+      <span>현재 단계:</span>
+      <span class="stage-current-val">${curStage
+        ? `${curGroupLabel} › ${curStage}`
+        : '선택되지 않음'
+      }</span>
+    </div>
+    <div>
+      ${STAGE_GROUPS.map((g, gi) => {
+        const hasActive = g.steps.includes(curStage);
+        return `
+        <div>
+          <div class="stage-group-header ${hasActive?'has-active':''}" onclick="toggleStageGroup(${gi})">
+            <div class="stage-group-name">
+              <span>${g.color==='warn'?'🔶':g.color==='done'?'✅':'📌'}</span>
+              <span>${g.label}</span>
+              ${hasActive ? `<span class="badge g" style="font-size:10px;padding:1px 6px">현재</span>` : ''}
+            </div>
+            <span class="stage-group-arrow" id="sga-${gi}">▾</span>
+          </div>
+          <div class="stage-steps-dropdown ${hasActive?'open':''}" id="sgd-${gi}">
+            ${g.steps.map(s => `
+              <button class="stage-step ${curStage===s?'active '+(g.color==='warn'?'warn':g.color==='done'?'done':''):''}"
+                onclick="selectStage('${s}')">${s}</button>
+            `).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function toggleStageGroup(gi) {
+  const dropdown = document.getElementById('sgd-'+gi);
+  const arrow    = document.getElementById('sga-'+gi);
+  const header   = arrow.closest('.stage-group-header');
+  const isOpen   = dropdown.classList.toggle('open');
+  header.classList.toggle('open', isOpen);
+  arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+}
+
+function selectStage(stage) {
+  curProp.stage = stage;
+  saveData();
+  renderStageGroups();
+  // 선택 후 해당 그룹은 닫기 (선택 완료 피드백)
+}
+
+function saveAreaInfo() {
+  if (!curProp) return;
+  curProp.area = {
+    good: document.getElementById('area-good').value,
+    feature: document.getElementById('area-feature').value,
+    priceT: parseFloat(document.getElementById('area-price-trade').value)||0,
+    priceJ: parseFloat(document.getElementById('area-price-jeonse').value)||0,
+    priceAsk: document.getElementById('area-price-ask').value,
+    listings: document.getElementById('area-listings').value,
+  };
+  saveData();
+}
+
+// 방문 타임라인
+function renderVisits() {
+  const tl = document.getElementById('visit-timeline');
+  const sorted = [...curProp.visits].sort((a,b)=>b.date.localeCompare(a.date));
+  tl.innerHTML = sorted.map((v,i) => {
+    const isAuction = v.mode==='경매';
+    const auc = v.auction||{};
+    return `
+    <div class="visit-item">
+      <div class="visit-dot ${isAuction?'auction':''}"></div>
+      <div class="visit-card">
+        <div class="visit-header" onclick="toggleVisit('vb-${v.id}','va-${v.id}')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="visit-date">${v.date}</span>
+            <span style="font-size:11px;color:var(--text3)">${sorted.length-i}회차</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="visit-type-badge ${isAuction?'auction':'normal'}">${isAuction?'⚖️ 경매':'🏠 일반'}</span>
+            <span class="badge ${judgeClass(v.judge)}">${judgeLabel(v.judge)}</span>
+            <button onclick="event.stopPropagation();openEditVisit('${v.id}')" style="background:var(--info-light);color:var(--info);border:1px solid #c5d4f0;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ 수정</button>
+            <button onclick="event.stopPropagation();deleteVisit('${v.id}')" style="background:var(--danger-light);color:var(--danger);border:1px solid #f0c8c8;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 삭제</button>
+            <span id="va-${v.id}" style="color:var(--text3);font-size:13px;transition:transform 0.2s">▾</span>
+          </div>
+        </div>
+        <div class="visit-body hidden" id="vb-${v.id}">
+          ${isAuction && auc.case ? `
+          <div class="auction-box">
+            <div class="auction-box-title">⚖️ 경매 정보</div>
+            ${auc.bidDate ? (() => {
+              const today = new Date(); today.setHours(0,0,0,0);
+              const bid = new Date(auc.bidDate); bid.setHours(0,0,0,0);
+              const diff = Math.round((bid - today) / (1000*60*60*24));
+              const dday = diff === 0 ? '🔴 오늘 입찰!' : diff > 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+              const color = diff <= 0 ? '#7c1e1e' : diff <= 1 ? '#c0392b' : diff <= 7 ? '#e67e00' : 'var(--info)';
+              const bg = diff <= 0 ? '#fdf0f0' : diff <= 7 ? '#fff8e0' : 'var(--info-light)';
+              return `<div style="background:${bg};border:1px solid ${color};border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:${color};font-weight:700">🔔 낙찰기일: ${auc.bidDate}</span>
+                <span style="font-size:14px;font-weight:800;color:${color}">${dday}</span>
+              </div>`;
+            })() : ''}
+            <div class="auction-grid">
+              <div class="auction-field"><div class="af-label">사건번호</div><div class="af-val">${auc.case}</div></div>
+              <div class="auction-field"><div class="af-label">감정가</div><div class="af-val">${fmt(auc.appraise)}만</div></div>
+              <div class="auction-field"><div class="af-label">최저입찰가</div><div class="af-val">${fmt(auc.minBid)}만</div></div>
+              ${auc.myBid ? `<div class="auction-field"><div class="af-label">내 입찰가</div><div class="af-val" style="color:var(--info);font-weight:700">${fmt(auc.myBid)}만</div></div>` : ''}
+              <div class="auction-field"><div class="af-label">말소기준일</div><div class="af-val">${auc.erasure||'-'}</div></div>
+              <div class="auction-field"><div class="af-label">배당종기일</div><div class="af-val">${auc.dividend||'-'}</div></div>
+              <div class="auction-field"><div class="af-label">대항력</div><div class="af-val">${auc.resist||'-'}</div></div>
+              <div class="auction-field"><div class="af-label">HUG 포기</div><div class="af-val">${auc.hug||'-'}</div></div>
+            </div>
+            ${auc.bidResult ? (() => {
+              const resultMap = { win:'✅ 낙찰 (본인)', lose:'🏆 낙찰 (타인)', cancel:'↩️ 유찰' };
+              const resultColor = auc.bidResult==='win' ? 'var(--accent)' : auc.bidResult==='lose' ? 'var(--warn)' : 'var(--text3)';
+              const rate = auc.winPrice && auc.appraise ? (auc.winPrice/auc.appraise*100).toFixed(1)+'%' : '-';
+              return `<div style="border-top:1px dashed #f0c878;margin-top:8px;padding-top:8px">
+                <div style="font-size:12px;font-weight:700;color:${resultColor};margin-bottom:6px">🏆 낙찰 결과: ${resultMap[auc.bidResult]||'-'}</div>
+                <div class="auction-grid">
+                  ${auc.winPrice ? `<div class="auction-field"><div class="af-label">실제 낙찰가</div><div class="af-val" style="font-weight:700">${fmt(auc.winPrice)}만</div></div>` : ''}
+                  ${auc.winPrice && auc.appraise ? `<div class="auction-field"><div class="af-label">낙찰율</div><div class="af-val" style="color:var(--info);font-weight:700">${rate}</div></div>` : ''}
+                  ${auc.myBid && auc.winPrice ? `<div class="auction-field"><div class="af-label">낙찰가 대비 내 입찰</div><div class="af-val">${fmt(auc.myBid - auc.winPrice)}만 ${auc.myBid >= auc.winPrice ? '초과' : '미달'}</div></div>` : ''}
+                </div>
+                ${auc.bidMemo ? `<div style="font-size:12px;color:var(--text2);margin-top:4px">📝 ${auc.bidMemo}</div>` : ''}
+              </div>`;
+            })() : ''}
+          </div>` : ''}
+          <div class="num-grid">
+            <div class="num-item"><div class="nl">매매가</div><div class="nv">${fmt(v.price)}만</div></div>
+            <div class="num-item"><div class="nl">전세가</div><div class="nv">${fmt(v.jeonse)}만</div></div>
+            <div class="num-item"><div class="nl">갭</div><div class="nv pos">${fmt(v.gap)}만</div></div>
+            <div class="num-item"><div class="nl">공시가</div><div class="nv">${fmt(v.pub)}만</div></div>
+            <div class="num-item"><div class="nl">공시×1.26</div><div class="nv info">${v.pub?fmt(Math.round(v.pub*1.26))+'만':'-'}</div></div>
+            <div class="num-item"><div class="nl">매물유형</div><div class="nv" style="font-size:11px">${v.dealtype||'-'}</div></div>
+          </div>
+          ${v.memo?`<div style="background:var(--surface2);border-radius:8px;padding:9px 11px;font-size:12px;line-height:1.7;margin-bottom:10px">📝 ${v.memo}</div>`:''}
+
+          <!-- 사진 썸네일 -->
+          ${v.photos && v.photos.length ? `
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:5px">📷 임장 사진 ${v.photos.length}장</div>
+            <div class="visit-photos">
+              ${v.photos.map((p,pi) => `
+                <div style="position:relative;display:inline-block">
+                  <img class="visit-photo-thumb" src="${p.dataUrl}" alt="${p.name}"
+                    onclick="openPhotoLightbox(${JSON.stringify(v.photos).replace(/"/g,'&quot;')},${pi})"
+                    title="클릭하면 크게 봅니다">
+                  <button onclick="deleteVisitPhoto('${v.id}',${pi})"
+                    style="position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(124,30,30,0.85);color:#fff;border:none;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>` : ''}
+          <div style="display:flex;gap:6px;margin-top:2px">
+            <button class="btn btn-profit" style="flex:1" onclick="openProfitTab('pp-${v.id}','profit')">
+              📊 수익 분석
+            </button>
+            <button class="btn" style="flex:1;background:#fff8e6;color:var(--warn);border:1px solid #f0c878;font-weight:600;font-size:12px" onclick="openProfitTab('pp-${v.id}','tax')">
+              💰 세금 분석
+            </button>
+          </div>
+
+          <!-- 분석 패널 -->
+          <div class="profit-panel" id="pp-${v.id}">
+            <div class="profit-tabs">
+              <button class="profit-tab active" id="ptab-profit-${v.id}" onclick="switchProfitTab('${v.id}','profit')">📊 수익 분석</button>
+              <button class="profit-tab" id="ptab-tax-${v.id}" onclick="switchProfitTab('${v.id}','tax')">💰 세금 분석</button>
+            </div>
+
+            <!-- ① 수익 분석 탭 -->
+            <div class="profit-tab-content active" id="ptc-profit-${v.id}">
+              <div class="profit-input-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="profit-input-group">
+                  <label>감정평가액 (만원)</label>
+                  <input type="number" id="assess-${v.id}" placeholder="추정 감정가"
+                    oninput="calcRights('${v.id}');calcProfit('${v.id}')">
+                </div>
+                <div class="profit-input-group">
+                  <label>비례율 (%)</label>
+                  <input type="number" id="ratio-${v.id}" placeholder="100" value="100"
+                    oninput="calcRights('${v.id}');calcProfit('${v.id}')">
+                </div>
+                <div class="profit-input-group">
+                  <label>권리가액 🔵</label>
+                  <input type="number" id="rights-${v.id}" readonly class="auto-val" placeholder="자동계산">
+                </div>
+                <div class="profit-input-group">
+                  <label>조합원분양가 (만원)</label>
+                  <input type="number" id="mbr-${v.id}" placeholder="조합원 분양가"
+                    oninput="calcRights('${v.id}');calcProfit('${v.id}')">
+                </div>
+                <div class="profit-input-group">
+                  <label>추가분담금 🔵</label>
+                  <input type="number" id="extra-${v.id}" readonly class="auto-val" placeholder="자동계산">
+                </div>
+                <div class="profit-input-group">
+                  <label>이주비대출 🔵</label>
+                  <input type="number" id="loan-${v.id}" readonly class="auto-val" placeholder="감정가×60%">
+                </div>
+                <div class="profit-input-group">
+                  <label>예상 매도가 (만원)</label>
+                  <input type="number" id="exit-${v.id}" placeholder="완공 후 예상 시세"
+                    oninput="calcProfit('${v.id}')">
+                </div>
+                <div class="profit-input-group">
+                  <label>총 실투자금 🔵</label>
+                  <input type="number" id="total-invest-${v.id}" readonly class="auto-val">
+                </div>
+                <div class="profit-input-group">
+                  <label>세전 수익률 🔵</label>
+                  <input type="text" id="roi-${v.id}" readonly class="auto-val">
+                </div>
+              </div>
+              <div id="profit-result-${v.id}">
+                <div style="text-align:center;font-size:12px;color:var(--text3);padding:10px">
+                  감정평가액과 예상 매도가를 입력하면 계산됩니다
+                </div>
+              </div>
+            </div>
+
+            <!-- ② 세금 분석 탭 -->
+            <div class="profit-tab-content" id="ptc-tax-${v.id}">
+              <div class="profit-input-grid">
+                <div class="profit-input-group">
+                  <label>투자자 포지션</label>
+                  <select id="pos-${v.id}" onchange="calcTax('${v.id}',${v.price})">
+                    <option value="무주택">무주택</option>
+                    <option value="1주택">1주택</option>
+                    <option value="주임사">주임사</option>
+                    <option value="법인">법인</option>
+                  </select>
+                </div>
+                <div class="profit-input-group">
+                  <label>지역 구분</label>
+                  <select id="region-${v.id}" onchange="calcTax('${v.id}',${v.price})">
+                    <option value="조정">조정대상지역</option>
+                    <option value="비조정">비조정지역</option>
+                  </select>
+                </div>
+                <div class="profit-input-group">
+                  <label>면적 구분</label>
+                  <select id="size-${v.id}" onchange="calcTax('${v.id}',${v.price})">
+                    <option value="일반">일반 (60㎡ 초과)</option>
+                    <option value="소형">소형 (60㎡ 이하)</option>
+                  </select>
+                </div>
+                <div class="profit-input-group">
+                  <label>보유기간</label>
+                  <select id="hold-${v.id}" onchange="calcTax('${v.id}',${v.price})">
+                    <option value="1미만">1년 미만</option>
+                    <option value="1~2년">1~2년</option>
+                    <option value="2년이상" selected>2년 이상</option>
+                  </select>
+                </div>
+                <div class="profit-input-group">
+                  <label>실거주 여부</label>
+                  <select id="live-${v.id}" onchange="calcTax('${v.id}',${v.price})">
+                    <option value="N">실거주 없음</option>
+                    <option value="Y">실거주 2년 이상</option>
+                  </select>
+                </div>
+                <div class="profit-input-group">
+                  <label>장기보유특별공제</label>
+                  <select id="ltd-${v.id}" onchange="calcTax('${v.id}',${v.price})">
+                    <option value="0">미적용 (3년 미만)</option>
+                    <option value="0.06">6% (3년)</option>
+                    <option value="0.10">10% (5년)</option>
+                    <option value="0.16">16% (8년)</option>
+                    <option value="0.20">20% (10년+)</option>
+                  </select>
+                </div>
+              </div>
+              <div id="tax-result-${v.id}">
+                <div style="text-align:center;font-size:12px;color:var(--text3);padding:10px">
+                  위 조건을 선택하면 세금이 자동 계산됩니다
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  tl.innerHTML += `
+    <div style="padding-left:40px">
+      <div style="display:flex;gap:8px">
+        <button class="add-visit-btn" style="flex:1" onclick="openAddVisit('일반')">+ 일반 방문</button>
+        <button class="add-visit-btn" style="flex:1;color:var(--warn);border-color:#f0c878" onclick="openAddVisit('경매')">+ 경매 방문</button>
+      </div>
+    </div>`;
+}
+
+function toggleVisit(bodyId, arrowId) {
+  const body = document.getElementById(bodyId);
+  const arrow = document.getElementById(arrowId);
+  const isHidden = body.classList.toggle('hidden');
+  if (arrow) arrow.style.transform = isHidden ? '' : 'rotate(180deg)';
+}
+
+function openProfitTab(panelId, tab) {
+  const panel = document.getElementById(panelId);
+  if (!panel.classList.contains('open')) panel.classList.add('open');
+  const vid = panelId.replace('pp-','');
+  switchProfitTab(vid, tab);
+}
+
+function switchProfitTab(vid, tab) {
+  ['profit','tax'].forEach(t => {
+    document.getElementById('ptab-'+t+'-'+vid)?.classList.toggle('active', t===tab);
+    document.getElementById('ptc-'+t+'-'+vid)?.classList.toggle('active', t===tab);
+  });
+  if (tab==='tax') calcTax(vid, parseFloat(document.getElementById('pp-'+vid)?.dataset?.price||0));
+}
+
+// 권리가액 자동계산
+function calcRights(vid) {
+  const assess = parseFloat(document.getElementById('assess-'+vid)?.value)||0;
+  const ratio  = parseFloat(document.getElementById('ratio-'+vid)?.value)||100;
+  const mbr    = parseFloat(document.getElementById('mbr-'+vid)?.value)||0;
+  const rights = Math.round(assess * ratio / 100);
+  const extra  = mbr > 0 ? Math.max(mbr - rights, 0) : 0;
+  const loan   = Math.round(assess * 0.6);
+  const el = id => document.getElementById(id+'-'+vid);
+  if (el('rights')) el('rights').value = assess ? rights : '';
+  if (el('extra'))  el('extra').value  = (mbr && assess) ? extra : '';
+  if (el('loan'))   el('loan').value   = assess ? loan : '';
+}
+
+// 수익 분석 계산
+function calcProfit(vid) {
+  const price   = parseFloat(document.getElementById('pp-'+vid)?.closest('.visit-card')?.querySelector('.nv')?.textContent?.replace(/[^0-9]/g,'')||0) || 0;
+  const gap     = parseFloat(document.querySelector(`#pp-${vid}`)?.closest('.visit-body')?.dataset?.gap||0)||0;
+  const assess  = parseFloat(document.getElementById('assess-'+vid)?.value)||0;
+  const ratio   = parseFloat(document.getElementById('ratio-'+vid)?.value)||100;
+  const mbr     = parseFloat(document.getElementById('mbr-'+vid)?.value)||0;
+  const exitPrice = parseFloat(document.getElementById('exit-'+vid)?.value)||0;
+
+  calcRights(vid);
+
+  const rights     = Math.round(assess * ratio / 100);
+  const extra      = mbr > 0 ? Math.max(mbr - rights, 0) : 0;
+  const loan       = Math.round(assess * 0.6);
+  const totalInvest = gap + extra;
+  const profit     = exitPrice ? exitPrice - totalInvest : 0;
+  const roi        = totalInvest > 0 && exitPrice ? (profit / totalInvest * 100) : 0;
+
+  // 총투자금, 수익률 업데이트
+  const el = id => document.getElementById(id+'-'+vid);
+  if (el('total-invest')) el('total-invest').value = totalInvest ? Math.round(totalInvest) : '';
+  if (el('roi')) {
+    el('roi').value = exitPrice ? roi.toFixed(1)+'%' : '';
+    el('roi').style.color = roi >= 0 ? 'var(--accent)' : 'var(--danger)';
+  }
+
+  const resultEl = document.getElementById('profit-result-'+vid);
+  if (!resultEl) return;
+  if (!exitPrice) {
+    resultEl.innerHTML = `<div style="text-align:center;font-size:12px;color:var(--text3);padding:10px">예상 매도가를 입력하면 계산됩니다</div>`;
+    return;
+  }
+
+  const row = (label, val, cls='') =>
+    `<div class="profit-row"><span class="profit-label">${label}</span><span class="profit-val ${cls}">${val}</span></div>`;
+
+  resultEl.innerHTML = `
+    <div class="profit-panel-subtitle">투자 원가</div>
+    ${row('매매가 (취득가)', fmt(gap > 0 ? gap + (parseFloat(document.getElementById('jeonse-ref-'+vid)||0)) : 0)+'만')}
+    ${row('갭 (실투자금)', fmt(gap)+'만')}
+    ${assess ? row('감정평가액', fmt(assess)+'만') : ''}
+    ${assess ? row('비례율', ratio+'%') : ''}
+    ${assess ? row('권리가액', fmt(rights)+'만', 'pos') : ''}
+    ${mbr ? row('조합원분양가', fmt(mbr)+'만') : ''}
+    ${mbr && assess ? row('추가분담금', fmt(extra)+'만', extra>0?'warn':'pos') : ''}
+    ${assess ? row('이주비대출 가능액', fmt(loan)+'만', 'pos') : ''}
+    <div class="profit-row"><span class="profit-label" style="font-weight:600">총 실투자금</span><span class="profit-val warn">${fmt(totalInvest)}만원</span></div>
+
+    <div class="profit-panel-subtitle">수익 결과</div>
+    ${row('예상 매도가', fmt(exitPrice)+'만')}
+    <div class="profit-row total">
+      <span class="profit-label" style="font-weight:700">세전 수익</span>
+      <span class="profit-val big ${profit>=0?'pos':'neg'}">${fmt(profit)}만원</span>
+    </div>
+    <div class="profit-row">
+      <span class="profit-label" style="font-weight:700">세전 수익률</span>
+      <span class="profit-val big ${roi>=0?'pos':'neg'}">${roi.toFixed(1)}%</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px;padding:6px 8px;background:rgba(255,255,255,0.6);border-radius:6px">
+      💡 세후 수익은 <strong>세금 분석</strong> 탭에서 확인하세요
+    </div>
+  `;
+}
+
+// 세금 분석 계산
+function calcTax(vid, price) {
+  if (!price) price = 0;
+  const pos    = document.getElementById('pos-'+vid)?.value || '무주택';
+  const region = document.getElementById('region-'+vid)?.value || '조정';
+  const size   = document.getElementById('size-'+vid)?.value || '일반';
+  const hold   = document.getElementById('hold-'+vid)?.value || '2년이상';
+  const live   = document.getElementById('live-'+vid)?.value || 'N';
+  const ltd    = parseFloat(document.getElementById('ltd-'+vid)?.value)||0;
+
+  // 취득세
+  let acqRate = 0;
+  if (pos==='무주택')  acqRate = size==='소형' ? 0.01 : 0.012;
+  else if (pos==='1주택') acqRate = region==='조정' ? 0.08 : (size==='소형'?0.01:0.03);
+  else if (pos==='주임사') acqRate = size==='소형' ? 0.01 : (region==='조정'?0.08:0.04);
+  else if (pos==='법인') acqRate = 0.12;
+  const acqTax   = Math.round(price * acqRate);
+  const ruralTax = Math.round(price * (pos==='법인'?0.01:0));
+  const eduTax   = Math.round(price * 0.001);
+  const totalAcq = acqTax + ruralTax + eduTax;
+
+  // 양도세 — 수익분석 탭 exit-vid 참조
+  const exitPrice  = parseFloat(document.getElementById('exit-'+vid)?.value)||0;
+  const gap        = parseFloat(document.getElementById('total-invest-'+vid)?.value)||0;
+  const profit     = exitPrice && gap ? exitPrice - gap : 0;
+
+  const resultEl = document.getElementById('tax-result-'+vid);
+  if (!resultEl) return;
+
+  const row = (label, val, cls='') =>
+    `<div class="profit-row"><span class="profit-label">${label}</span><span class="profit-val ${cls}">${val}</span></div>`;
+
+  let cgtHtml = '';
+  let netProfit = profit;
+
+  if (profit > 0) {
+    let taxable = Math.max(profit - 250, 0);
+    taxable = Math.round(taxable * (1 - ltd));
+    let cgtRate = 0, cgtNote = '';
+    if (hold==='1미만') { cgtRate=0.70; cgtNote='단기 70%'; }
+    else if (hold==='1~2년') { cgtRate=0.60; cgtNote='단기 60%'; }
+    else if ((pos==='무주택'||pos==='1주택') && live==='Y' && profit<=12000) {
+      cgtRate=0; cgtNote='1주택 비과세';
+    } else {
+      if (pos==='법인') { cgtRate=0.20; cgtNote='법인세+20%p'; }
+      else if (taxable<=1400) { cgtRate=0.06; cgtNote='6%'; }
+      else if (taxable<=5000) { cgtRate=0.15; cgtNote='15%'; }
+      else if (taxable<=8800) { cgtRate=0.24; cgtNote='24%'; }
+      else if (taxable<=15000) { cgtRate=0.35; cgtNote='35%'; }
+      else if (taxable<=30000) { cgtRate=0.38; cgtNote='38%'; }
+      else if (taxable<=50000) { cgtRate=0.40; cgtNote='40%'; }
+      else { cgtRate=0.42; cgtNote='42%'; }
+      if (pos==='1주택' && region==='조정' && live==='N') { cgtRate=Math.min(cgtRate+0.20,0.70); cgtNote+=' +중과 20%p'; }
+    }
+    const cgt      = Math.round(taxable * cgtRate);
+    const localTax = Math.round(cgt * 0.1);
+    netProfit      = profit - cgt - localTax;
+    const netRoi   = gap > 0 ? (netProfit / gap * 100) : 0;
+
+    cgtHtml = `
+      <div class="profit-panel-subtitle">양도소득세</div>
+      ${row('세전 수익', fmt(profit)+'만')}
+      ${row('기본공제', '250만')}
+      ${ltd ? row('장기보유특별공제', (ltd*100)+'%') : ''}
+      ${row('과세표준', fmt(taxable)+'만')}
+      ${row('적용 세율 ('+cgtNote+')', (cgtRate*100).toFixed(0)+'%')}
+      ${row('양도소득세', fmt(cgt)+'만', 'warn')}
+      ${row('지방소득세 (10%)', fmt(localTax)+'만', 'warn')}
+      <div class="profit-row total">
+        <span class="profit-label" style="font-weight:700">세후 실수익</span>
+        <span class="profit-val big ${netProfit>=0?'pos':'neg'}">${fmt(netProfit)}만원</span>
+      </div>
+      <div class="profit-row">
+        <span class="profit-label" style="font-weight:700">세후 수익률</span>
+        <span class="profit-val big ${netRoi>=0?'pos':'neg'}">${netRoi.toFixed(1)}%</span>
+      </div>`;
+  } else {
+    cgtHtml = `<div style="text-align:center;font-size:12px;color:var(--text3);padding:8px">수익분석 탭에서 예상 매도가를 먼저 입력해주세요</div>`;
+  }
+
+  resultEl.innerHTML = `
+    <div class="profit-panel-subtitle">취득세 — ${pos} / ${region==='조정'?'조정지역':'비조정지역'} / ${size}</div>
+    ${row('매매가', fmt(price)+'만')}
+    ${row('취득세율', (acqRate*100).toFixed(1)+'%')}
+    ${row('취득세', fmt(acqTax)+'만', 'warn')}
+    ${ruralTax ? row('농어촌특별세', fmt(ruralTax)+'만', 'warn') : ''}
+    ${row('지방교육세', fmt(eduTax)+'만', 'warn')}
+    <div class="profit-row total">
+      <span class="profit-label" style="font-weight:700">취득세 합계</span>
+      <span class="profit-val warn">${fmt(totalAcq)}만원</span>
+    </div>
+    ${cgtHtml}
+  `;
+}
+
+// ── 세금 모달 탭 ──────────────────────────────────────────────────
+function switchTaxTab(id) {
+  document.querySelectorAll('.tax-tab').forEach((b,i) =>
+    b.classList.toggle('active', ['acq','cgt','pos'][i]===id)
+  );
+  document.querySelectorAll('.tax-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tax-'+id).classList.add('active');
+}
+
+// ── 지도 ────────────────────────────────────────────────────────
+function openMap() {
+  if (!curProp) return;
+  const q = encodeURIComponent(curGu.name + ' ' + curProp.addr);
+  window.open('https://map.kakao.com/link/search/' + q, '_blank');
+}
+
+function updateMapLink() {
+  if (!curProp) return;
+  const addr = curGu.name + ' ' + curProp.addr;
+  renderKakaoMap(addr);
+}
+
+let kakaoMapInstance = null;
+let kakaoMapCurrentAddr = null;
+
+function renderKakaoMap(addr) {
+  const container = document.getElementById('kakao-map');
+  if (!container) return;
+
+  if (typeof kakao === 'undefined' || typeof kakao.maps === 'undefined') {
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--text3)">지도 로딩 중...</div>';
+    setTimeout(() => renderKakaoMap(addr), 500);
+    return;
+  }
+
+  // 주소가 바뀌면 기존 인스턴스 초기화
+  if (kakaoMapCurrentAddr !== addr) {
+    kakaoMapInstance = null;
+    kakaoMapCurrentAddr = addr;
+  }
+
+  const geocoder = new kakao.maps.services.Geocoder();
+  geocoder.addressSearch(addr, function(result, status) {
+    if (status === kakao.maps.services.Status.OK) {
+      const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+      if (!kakaoMapInstance) {
+        kakaoMapInstance = new kakao.maps.Map(container, { center: coords, level: 4 });
+      } else {
+        kakaoMapInstance.setCenter(coords);
+        kakaoMapInstance.setLevel(4);
+      }
+      if (window._kakaoMarker) window._kakaoMarker.setMap(null);
+      window._kakaoMarker = new kakao.maps.Marker({ map: kakaoMapInstance, position: coords });
+      const infowindow = new kakao.maps.InfoWindow({
+        content: `<div style="padding:4px 8px;font-size:11px;font-weight:600">${curProp.addr}</div>`
+      });
+      infowindow.open(kakaoMapInstance, window._kakaoMarker);
+    } else {
+      container.innerHTML = `<a href="https://map.kakao.com/link/search/${encodeURIComponent(addr)}" target="_blank"
+        style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;text-decoration:none;background:var(--surface2);border-radius:8px;cursor:pointer">
+        <div style="font-size:28px">📍</div>
+        <div style="font-size:12px;font-weight:500;color:var(--text2)">${curProp.addr}</div>
+        <div style="font-size:11px;color:var(--accent)">카카오맵에서 보기 →</div>
+      </a>`;
+    }
+  });
+}
+
+
+// ── 구획도 업로드 (압축 저장) ─────────────────────────────────────
+function uploadZoneMap(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      // 최대 1200px, JPEG 80% (구획도는 글씨가 있어 조금 더 고화질)
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', 0.80);
+      // 저장
+      if (!curProp.area) curProp.area = {};
+      curProp.area.zoneMap = compressed;
+      saveData();
+      renderZoneMap();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function renderZoneMap() {
+  const zoneMap = curProp?.area?.zoneMap;
+  const img   = document.getElementById('zone-map-img');
+  const empty = document.getElementById('zone-map-empty');
+  const del   = document.getElementById('zone-map-del');
+  if (!img) return;
+  if (zoneMap) {
+    img.src = zoneMap;
+    img.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    if (del)   del.style.display = 'block';
+  } else {
+    img.src = '';
+    img.style.display = 'none';
+    if (empty) empty.style.display = 'flex';
+    if (del)   del.style.display = 'none';
+  }
+}
+
+function clearZoneMap() {
+  if (!confirm('구획도를 삭제할까요?')) return;
+  if (curProp?.area) curProp.area.zoneMap = null;
+  saveData();
+  renderZoneMap();
+}
+
+function openZoneLightbox() {
+  const zoneMap = curProp?.area?.zoneMap;
+  if (!zoneMap) return;
+  document.getElementById('zone-lightbox-img').src = zoneMap;
+  document.getElementById('zone-lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeZoneLightbox() {
+  document.getElementById('zone-lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ── 모달 ────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); })
+);
+
+function addGu() {
+  const name = document.getElementById('new-gu-name').value.trim();
+  if (!name) { alert('구 이름을 입력해주세요'); return; }
+  data.gus.push({ id: genId(), name, memo: document.getElementById('new-gu-memo').value, props: [] });
+  saveData(); closeModal('modal-add-gu');
+  document.getElementById('new-gu-name').value='';
+  document.getElementById('new-gu-memo').value='';
+  renderGu();
+}
+
+function addProp() {
+  const addr = document.getElementById('new-prop-addr').value.trim();
+  if (!addr) { alert('주소를 입력해주세요'); return; }
+  curGu.props.push({ id: genId(), addr, dtype: document.getElementById('new-prop-dtype').value, stage: '', area: {}, visits: [] });
+  saveData(); closeModal('modal-add-prop');
+  document.getElementById('new-prop-addr').value = '';
+  renderProps();
+}
+
+// ── 방문 사진 ─────────────────────────────────────────────────────
+let visitPhotos = []; // 모달 임시 보관 [{dataUrl, name}]
+
+function handleVisitPhotos(e) {
+  const files = [...e.target.files];
+  const remain = 5 - visitPhotos.length;
+  if (remain <= 0) { alert('사진은 최대 5장까지 추가할 수 있습니다.'); return; }
+  files.slice(0, remain).forEach(file => compressVisitPhoto(file));
+  if (files.length > remain) alert(`${remain}장만 추가됩니다.`);
+  e.target.value = '';
+}
+
+function compressVisitPhoto(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
+      visitPhotos.push({ dataUrl, name: file.name });
+      renderVisitPhotoPreview();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderVisitPhotoPreview() {
+  const grid = document.getElementById('v-photo-preview');
+  if (!grid) return;
+  grid.innerHTML = visitPhotos.map((p, i) => `
+    <div class="v-preview-item">
+      <img src="${p.dataUrl}" alt="${p.name}">
+      <button class="v-preview-del" onclick="removeVisitPhoto(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeVisitPhoto(idx) {
+  visitPhotos.splice(idx, 1);
+  renderVisitPhotoPreview();
+}
+
+// 라이트박스 (방문 사진용)
+let lbPhotos = [], lbIdx = 0;
+
+function openPhotoLightbox(photos, idx) {
+  lbPhotos = photos; lbIdx = idx;
+  updatePhotoLightbox();
+  document.getElementById('photo-lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closePhotoLightbox() {
+  document.getElementById('photo-lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function lbNav(dir) {
+  lbIdx = (lbIdx + dir + lbPhotos.length) % lbPhotos.length;
+  updatePhotoLightbox();
+}
+function updatePhotoLightbox() {
+  document.getElementById('lb-img').src = lbPhotos[lbIdx].dataUrl;
+  document.getElementById('lb-info').textContent = `${lbIdx+1} / ${lbPhotos.length}`;
+}
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('photo-lightbox').classList.contains('open')) return;
+  if (e.key==='ArrowLeft') lbNav(-1);
+  if (e.key==='ArrowRight') lbNav(1);
+  if (e.key==='Escape') closePhotoLightbox();
+});
+
+function openAddVisit(mode) {
+  visitPhotos = [];
+  renderVisitPhotoPreview();
+  document.getElementById('visit-mode').value = mode;
+  document.getElementById('visit-modal-title').textContent = mode==='경매'?'⚖️ 경매 방문 추가':'🏠 일반 방문 추가';
+  document.getElementById('v-auction-fields').style.display = mode==='경매'?'block':'none';
+  document.getElementById('v-normal-type').style.display = mode==='경매'?'none':'block';
+  document.getElementById('v-date').value = new Date().toISOString().slice(0,10);
+  // 물건 주소 기본값 + 링크 업데이트
+  const addrEl = document.getElementById('v-prop-addr');
+  if (addrEl) { addrEl.value = curProp.addr || ''; updateVisitLinks('v'); }
+  openModal('modal-add-visit');
+}
+
+function updateVisitAsilLink() { updateVisitLinks('v'); }
+function updateEditVisitAsilLink() { updateVisitLinks('ev'); }
+
+function updateVisitLinks(prefix) {
+  const addr = document.getElementById(prefix + '-prop-addr')?.value.trim() || '';
+  const fullAddr = curGu ? curGu.name + ' ' + addr : addr;
+  const naverEl = document.getElementById(prefix + '-link-naver');
+  if (naverEl) naverEl.href = addr ? `https://map.naver.com/v5/search/${encodeURIComponent(fullAddr)}` : '#';
+}
+
+function copyAddr(inputId) {
+  const val = document.getElementById(inputId)?.value.trim();
+  if (!val) { alert('주소를 입력해주세요'); return; }
+  navigator.clipboard.writeText(val).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ 복사됨';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function copyDetailAddr() {
+  const addr = document.getElementById('detail-addr-text')?.textContent || '';
+  if (!addr) return;
+  navigator.clipboard.writeText(addr).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ 복사됨';
+    setTimeout(() => btn.textContent = '📋 복사', 1500);
+  });
+}
+
+function calcGap() {
+  const p = parseFloat(document.getElementById('v-price').value)||0;
+  const j = parseFloat(document.getElementById('v-jeonse').value)||0;
+  document.getElementById('v-gap').value = p&&j ? fmt(p-j)+'만' : '';
+}
+
+// ── 공지사항 ──────────────────────────────────────────────────
+
+function renderNotices() {
+  const el = document.getElementById('notice-content');
+  if (!el) return;
+  if (!data.notices || !data.notices.length) {
+    // 기본 공지 (드라이브에 없을 때)
+    el.innerHTML = `
+      <div class="notice-item">v3 출시 — 구글 드라이브 자동저장 연동</div>
+      <div class="notice-item">카카오맵 지도 바로 표시</div>
+      <div class="notice-item">임장 플래너 추가</div>
+      <div class="notice-item">경매 낙찰기일 D-day 알림</div>`;
+    return;
+  }
+  // 최신 버전 순으로 표시
+  const sorted = [...data.notices].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const latest = sorted[0];
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:12px;font-weight:700;color:var(--accent)">${latest.version}</span>
+      <span style="font-size:11px;color:var(--text3)">${latest.date}</span>
+      ${sorted.length > 1 ? `<button onclick="toggleNoticeHistory()" style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;text-decoration:underline" id="notice-toggle-btn">이전 이력 보기 ▾</button>` : ''}
+    </div>
+    ${latest.items.map(i => `<div class="notice-item">${i}</div>`).join('')}
+    <div id="notice-history-collapsed" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
+      ${sorted.slice(1).map(n => `
+        <div style="margin-bottom:10px">
+          <div style="display:flex;gap:8px;margin-bottom:4px">
+            <span style="font-size:11px;font-weight:700;color:var(--text2)">${n.version}</span>
+            <span style="font-size:11px;color:var(--text3)">${n.date}</span>
+          </div>
+          ${n.items.map(i => `<div class="notice-item" style="color:var(--text3)">${i}</div>`).join('')}
+        </div>`).join('')}
+    </div>`;
+}
+
+function toggleNoticeHistory() {
+  const el = document.getElementById('notice-history-collapsed');
+  const btn = document.getElementById('notice-toggle-btn');
+  if (!el || !btn) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '이전 이력 보기 ▾' : '이전 이력 접기 ▴';
+}
+
+function openNoticeModal() {
+  // 새 버전 입력 초기화
+  document.getElementById('notice-new-ver').value = '';
+  document.getElementById('notice-new-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('notice-new-items').value = '';
+  // 이력 렌더
+  renderNoticeHistoryList();
+  openModal('modal-notice');
+}
+
+function renderNoticeHistoryList() {
+  const el = document.getElementById('notice-history-list');
+  if (!el) return;
+  if (!data.notices || !data.notices.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px">등록된 공지사항이 없습니다</div>';
+    return;
+  }
+  const sorted = [...data.notices].sort((a, b) => new Date(b.date) - new Date(a.date));
+  el.innerHTML = sorted.map((n, idx) => `
+    <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;font-weight:700;color:var(--accent)">${n.version}</span>
+          <span style="font-size:11px;color:var(--text3)">${n.date}</span>
+        </div>
+        <button onclick="deleteNoticeVersion(${idx})" style="background:var(--danger-light);color:var(--danger);border:1px solid #f0c8c8;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans)">삭제</button>
+      </div>
+      ${n.items.map(i => `<div style="font-size:12px;color:var(--text2);line-height:1.8">· ${i}</div>`).join('')}
+    </div>`).join('');
+}
+
+function addNoticeVersion() {
+  const ver   = document.getElementById('notice-new-ver').value.trim();
+  const date  = document.getElementById('notice-new-date').value;
+  const items = document.getElementById('notice-new-items').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  if (!ver || !date || !items.length) { alert('버전, 날짜, 내용을 모두 입력해주세요'); return; }
+  if (!data.notices) data.notices = [];
+  data.notices.push({ version: ver, date, items });
+  saveData();
+  renderNotices();
+  renderNoticeHistoryList();
+  document.getElementById('notice-new-ver').value = '';
+  document.getElementById('notice-new-items').value = '';
+}
+
+function deleteNoticeVersion(idx) {
+  const sorted = [...data.notices].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const target = sorted[idx];
+  if (!confirm(`"${target.version}" 공지를 삭제할까요?`)) return;
+  data.notices = data.notices.filter(n => !(n.version === target.version && n.date === target.date));
+  saveData();
+  renderNotices();
+  renderNoticeHistoryList();
+}
+
+
+function checkBidDateAlerts() {
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // 낙찰기일 있고 결과 없는 경매 물건 전체 수집
+  const alerts = [];
+  data.gus.forEach(gu => {
+    gu.props.forEach(prop => {
+      prop.visits.forEach(visit => {
+        if (visit.mode !== '경매' || !visit.auction?.bidDate) return;
+        if (visit.auction.bidResult) return; // 결과 기록된 건 제외
+        const bid = new Date(visit.auction.bidDate); bid.setHours(0,0,0,0);
+        const diff = Math.round((bid - today) / (1000*60*60*24));
+        alerts.push({ gu, prop, visit, diff });
+      });
+    });
+  });
+
+  const section = document.getElementById('bid-alert-section');
+  const list    = document.getElementById('bid-alert-list');
+  const count   = document.getElementById('bid-alert-count');
+  if (!section || !list) return;
+
+  if (!alerts.length) { section.style.display = 'none'; return; }
+
+  // D-day 오름차순 정렬
+  alerts.sort((a, b) => a.diff - b.diff);
+
+  section.style.display = 'block';
+  count.textContent = `총 ${alerts.length}건`;
+
+  list.innerHTML = alerts.map(({ gu, prop, visit, diff }) => {
+    const auc = visit.auction;
+    let ddayLabel, bgColor, borderColor, textColor;
+    if (diff < 0) {
+      ddayLabel = `D+${Math.abs(diff)} (기일 경과)`;
+      bgColor = '#f5f5f5'; borderColor = '#ccc'; textColor = 'var(--text3)';
+    } else if (diff === 0) {
+      ddayLabel = '🔴 오늘!';
+      bgColor = '#fdf0f0'; borderColor = '#e53935'; textColor = '#c0392b';
+    } else if (diff === 1) {
+      ddayLabel = '🟠 내일 (D-1)';
+      bgColor = '#fff3e0'; borderColor = '#fb8c00'; textColor = '#e67e00';
+    } else if (diff <= 7) {
+      ddayLabel = `🟡 D-${diff}`;
+      bgColor = '#fffde7'; borderColor = '#f9a825'; textColor = '#f57f17';
+    } else {
+      ddayLabel = `D-${diff}`;
+      bgColor = 'var(--surface)'; borderColor = 'var(--border)'; textColor = 'var(--text2)';
+    }
+
+    const rate = auc.myBid && auc.appraise
+      ? ` · 입찰률 ${(auc.myBid/auc.appraise*100).toFixed(1)}%` : '';
+
+    return `
+    <div onclick="goLevel(2,${gu.id},${prop.id})"
+      style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;transition:opacity 0.15s"
+      onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:700;color:${textColor}">${ddayLabel}</span>
+          <span style="font-size:11px;color:var(--text3)">${auc.bidDate}</span>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${gu.name} ${prop.addr}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">
+          ${auc.case || '사건번호 미입력'} · 최저 ${fmt(auc.minBid)}만${auc.myBid ? ` · 내 입찰 ${fmt(auc.myBid)}만${rate}` : ''}
+        </div>
+      </div>
+      <div style="font-size:20px;font-weight:800;color:${textColor};white-space:nowrap;font-family:var(--mono)">
+        ${diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function createBidAlertContainer() { return null; } // 레거시 호환용
+
+
+
+function switchTab(tab) {
+  const isGu = tab === 'gu';
+  // 탭 스타일
+  document.getElementById('tab-gu').style.borderBottomColor = isGu ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-gu').style.color = isGu ? 'var(--accent)' : 'var(--text3)';
+  document.getElementById('tab-gu').style.fontWeight = isGu ? '600' : '500';
+  document.getElementById('tab-plan').style.borderBottomColor = !isGu ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-plan').style.color = !isGu ? 'var(--accent)' : 'var(--text3)';
+  document.getElementById('tab-plan').style.fontWeight = !isGu ? '600' : '500';
+  // 뷰 전환
+  document.getElementById('view-plan').style.display = isGu ? 'none' : 'block';
+  document.getElementById('view-gu').style.display = isGu ? 'block' : 'none';
+  document.getElementById('view-prop').style.display = 'none';
+  document.getElementById('view-detail').style.display = 'none';
+  document.getElementById('breadcrumb').style.display = isGu ? 'flex' : 'none';
+  if (!isGu) {
+    // 오늘 날짜 기본 설정
+    const dateEl = document.getElementById('plan-date');
+    if (!dateEl.value) dateEl.value = new Date().toISOString().slice(0, 10);
+    renderPlan();
+  }
+}
+
+function renderPlan() {
+  const date = document.getElementById('plan-date').value;
+  if (!date) return;
+  const plan = getPlanForDate(date);
+  const list = document.getElementById('plan-list');
+  const empty = document.getElementById('plan-empty');
+  const summary = document.getElementById('plan-summary');
+
+  if (!plan || !plan.items.length) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    summary.textContent = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  const done = plan.items.filter(i => i.done).length;
+  summary.textContent = `총 ${plan.items.length}곳 · 완료 ${done}곳`;
+
+  list.innerHTML = plan.items.map((item, idx) => {
+    const gu = data.gus.find(g => String(g.id) === String(item.guId));
+    const prop = gu?.props.find(p => String(p.id) === String(item.propId));
+    if (!gu || !prop) return '';
+    const lastVisit = prop.visits[prop.visits.length - 1];
+    const hasVisit = prop.visits.length > 0;
+    return `
+    <div style="background:var(--surface);border:1px solid ${item.done ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;${item.done ? 'opacity:0.75' : ''}">
+      <button onclick="togglePlanDone('${date}',${idx})"
+        style="width:24px;height:24px;border-radius:50%;border:2px solid ${item.done ? 'var(--accent)' : 'var(--border)'};background:${item.done ? 'var(--accent)' : 'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff">
+        ${item.done ? '✓' : ''}
+      </button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;${item.done ? 'text-decoration:line-through;color:var(--text3)' : ''}">${prop.addr}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${gu.name} · ${prop.dtype}</div>
+        ${lastVisit ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">최근 방문: ${lastVisit.date} · ${judgeLabel(lastVisit.judge)}</div>` : '<div style="font-size:11px;color:var(--text3);margin-top:2px">방문 기록 없음</div>'}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button onclick="goToPropFromPlan('${item.guId}','${item.propId}')"
+          style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer">
+          ${hasVisit ? '상세보기' : '방문기록 입력'} ▶
+        </button>
+        <button onclick="removePlanItem('${date}',${idx})"
+          style="padding:6px 10px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);cursor:pointer">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getPlanForDate(date) {
+  if (!data.plans) data.plans = [];
+  return data.plans.find(p => p.date === date);
+}
+
+function getOrCreatePlan(date) {
+  if (!data.plans) data.plans = [];
+  let plan = data.plans.find(p => p.date === date);
+  if (!plan) { plan = { date, items: [] }; data.plans.push(plan); }
+  return plan;
+}
+
+function togglePlanDone(date, idx) {
+  const plan = getPlanForDate(date);
+  if (!plan) return;
+  plan.items[idx].done = !plan.items[idx].done;
+  saveData();
+  renderPlan();
+}
+
+function removePlanItem(date, idx) {
+  const plan = getPlanForDate(date);
+  if (!plan) return;
+  plan.items.splice(idx, 1);
+  if (!plan.items.length) data.plans = data.plans.filter(p => p.date !== date);
+  saveData();
+  renderPlan();
+}
+
+function goToPropFromPlan(guId, propId) {
+  switchTab('gu');
+  goLevel(2, parseFloat(guId), parseFloat(propId));
+}
+
+function openAddPlanItem() {
+  const date = document.getElementById('plan-date').value;
+  if (!date) { alert('날짜를 먼저 선택해주세요'); return; }
+  // 구역 셀렉트 채우기
+  const guSel = document.getElementById('plan-gu-select');
+  guSel.innerHTML = '<option value="">구역을 선택하세요</option>' +
+    data.gus.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('plan-prop-select').innerHTML = '<option value="">물건을 선택하세요</option>';
+  openModal('modal-add-plan');
+}
+
+function renderPlanPropSelect() {
+  const guId = document.getElementById('plan-gu-select').value;
+  const propSel = document.getElementById('plan-prop-select');
+  if (!guId) { propSel.innerHTML = '<option value="">물건을 선택하세요</option>'; return; }
+  const gu = data.gus.find(g => String(g.id) === String(guId));
+  propSel.innerHTML = '<option value="">물건을 선택하세요</option>' +
+    (gu?.props || []).map(p => `<option value="${p.id}">${p.addr}</option>`).join('');
+}
+
+function addPlanItem() {
+  const date = document.getElementById('plan-date').value;
+  const guId = document.getElementById('plan-gu-select').value;
+  const propId = document.getElementById('plan-prop-select').value;
+  if (!guId || !propId) { alert('구역과 물건을 선택해주세요'); return; }
+  const plan = getOrCreatePlan(date);
+  // 중복 체크
+  if (plan.items.find(i => String(i.propId) === String(propId))) {
+    alert('이미 추가된 물건입니다'); return;
+  }
+  plan.items.push({ guId, propId, done: false });
+  saveData();
+  closeModal('modal-add-plan');
+  renderPlan();
+}
+
+
+function deleteVisit(visitId) {
+  if (!confirm('이 방문 기록을 삭제할까요?')) return;
+  curProp.visits = curProp.visits.filter(v => String(v.id) !== String(visitId));
+  saveData();
+  renderVisits();
+}
+
+// ── 방문 사진 개별 삭제 (저장된 방문에서) ─────────────────────────
+function deleteVisitPhoto(visitId, photoIdx) {
+  if (!confirm('이 사진을 삭제할까요?')) return;
+  const visit = curProp.visits.find(v => String(v.id) === String(visitId));
+  if (!visit) return;
+  visit.photos.splice(photoIdx, 1);
+  saveData();
+  renderVisits();
+}
+
+// ── 방문 수정 모달 열기 ───────────────────────────────────────────
+let editVisitPhotos = []; // 수정 모달용 기존 사진 배열 (변경 가능)
+let editNewPhotos = [];   // 수정 모달에서 새로 추가한 사진
+
+function openEditVisit(visitId) {
+  const visit = curProp.visits.find(v => String(v.id) === String(visitId));
+  if (!visit) return;
+  const isAuction = visit.mode === '경매';
+  editVisitPhotos = visit.photos ? [...visit.photos] : [];
+  editNewPhotos = [];
+
+  document.getElementById('edit-visit-id').value = visitId;
+  document.getElementById('edit-visit-mode').value = visit.mode;
+  document.getElementById('edit-visit-modal-title').textContent = isAuction ? '✏️ 경매 방문 수정' : '✏️ 일반 방문 수정';
+  document.getElementById('ev-auction-fields').style.display = isAuction ? 'block' : 'none';
+  document.getElementById('ev-normal-type').style.display = isAuction ? 'none' : 'block';
+
+  // 물건 주소 input + 링크 업데이트
+  const addrEl = document.getElementById('ev-prop-addr');
+  if (addrEl) { addrEl.value = visit.propAddr || curProp.addr || ''; updateVisitLinks('ev'); }
+
+  document.getElementById('ev-date').value = visit.date || '';
+  document.getElementById('ev-memo').value = visit.memo || '';
+  document.getElementById('ev-price').value = visit.price || '';
+  document.getElementById('ev-jeonse').value = visit.jeonse || '';
+  document.getElementById('ev-pub').value = visit.pub || '';
+  document.getElementById('ev-judge').value = visit.judge || '';
+  calcEditGap();
+
+  // 매물유형 선택
+  const dealtypeEl = document.getElementById('ev-dealtype');
+  for (let i = 0; i < dealtypeEl.options.length; i++) {
+    if (dealtypeEl.options[i].value === visit.dealtype) { dealtypeEl.selectedIndex = i; break; }
+  }
+
+  // 경매 필드
+  if (isAuction && visit.auction) {
+    const a = visit.auction;
+    document.getElementById('ev-case').value = a.case || '';
+    document.getElementById('ev-appraise').value = a.appraise || '';
+    document.getElementById('ev-min-bid').value = a.minBid || '';
+    document.getElementById('ev-erasure').value = a.erasure || '';
+    document.getElementById('ev-dividend').value = a.dividend || '';
+    document.getElementById('ev-bid-date').value = a.bidDate || '';
+    document.getElementById('ev-my-bid').value = a.myBid || '';
+    document.getElementById('ev-bid-result').value = a.bidResult || '';
+    document.getElementById('ev-win-price').value = a.winPrice || '';
+    document.getElementById('ev-bid-memo').value = a.bidMemo || '';
+    const resistEl = document.getElementById('ev-resist');
+    for (let i = 0; i < resistEl.options.length; i++) {
+      if (resistEl.options[i].value === a.resist) { resistEl.selectedIndex = i; break; }
+    }
+    const hugEl = document.getElementById('ev-hug');
+    for (let i = 0; i < hugEl.options.length; i++) {
+      if (hugEl.options[i].value === a.hug) { hugEl.selectedIndex = i; break; }
+    }
+  }
+
+  renderEditExistingPhotos();
+  renderEditNewPhotoPreview();
+  openModal('modal-edit-visit');
+}
+
+function calcEditGap() {
+  const p = parseFloat(document.getElementById('ev-price').value)||0;
+  const j = parseFloat(document.getElementById('ev-jeonse').value)||0;
+  document.getElementById('ev-gap').value = p&&j ? fmt(p-j)+'만' : '';
+}
+
+// 기존 사진 렌더 (삭제 버튼 포함)
+function renderEditExistingPhotos() {
+  const grid = document.getElementById('ev-existing-photos');
+  if (!grid) return;
+  if (!editVisitPhotos.length) {
+    grid.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:4px">사진 없음</div>';
+    return;
+  }
+  grid.innerHTML = editVisitPhotos.map((p, i) => `
+    <div style="position:relative">
+      <img src="${p.dataUrl}" alt="${p.name||''}"
+        style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--border)">
+      <button onclick="removeEditExistingPhoto(${i})"
+        style="position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(124,30,30,0.85);color:#fff;border:none;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeEditExistingPhoto(idx) {
+  editVisitPhotos.splice(idx, 1);
+  renderEditExistingPhotos();
+}
+
+// 새 사진 추가 (수정 모달)
+function handleEditVisitPhotos(e) {
+  const files = [...e.target.files];
+  const remain = 5 - editVisitPhotos.length - editNewPhotos.length;
+  if (remain <= 0) { alert('사진은 최대 5장까지 추가할 수 있습니다.'); return; }
+  files.slice(0, remain).forEach(file => compressEditVisitPhoto(file));
+  if (files.length > remain) alert(`${remain}장만 추가됩니다.`);
+  e.target.value = '';
+}
+
+function compressEditVisitPhoto(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      editNewPhotos.push({ dataUrl: canvas.toDataURL('image/jpeg', 0.70), name: file.name });
+      renderEditNewPhotoPreview();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderEditNewPhotoPreview() {
+  const grid = document.getElementById('ev-new-photo-preview');
+  if (!grid) return;
+  grid.innerHTML = editNewPhotos.map((p, i) => `
+    <div style="position:relative">
+      <img src="${p.dataUrl}" alt="${p.name}"
+        style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--accent)">
+      <button onclick="removeEditNewPhoto(${i})"
+        style="position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(124,30,30,0.85);color:#fff;border:none;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeEditNewPhoto(idx) {
+  editNewPhotos.splice(idx, 1);
+  renderEditNewPhotoPreview();
+}
+
+// ── 방문 수정 저장 ─────────────────────────────────────────────
+function saveEditVisit() {
+  const visitId = document.getElementById('edit-visit-id').value;
+  const mode = document.getElementById('edit-visit-mode').value;
+  const visit = curProp.visits.find(v => String(v.id) === String(visitId));
+  if (!visit) return;
+
+  const price = parseFloat(document.getElementById('ev-price').value)||0;
+  const jeonse = parseFloat(document.getElementById('ev-jeonse').value)||0;
+  const propAddr = document.getElementById('ev-prop-addr')?.value.trim() || curProp.addr;
+
+  // 입력한 주소로 물건 주소 자동 업데이트
+  if (propAddr && propAddr !== curProp.addr) { curProp.addr = propAddr; }
+  visit.propAddr = propAddr;
+  visit.date = document.getElementById('ev-date').value;
+  visit.memo = document.getElementById('ev-memo').value;
+  visit.price = price;
+  visit.jeonse = jeonse;
+  visit.gap = price - jeonse;
+  visit.pub = parseFloat(document.getElementById('ev-pub').value)||0;
+  visit.judge = document.getElementById('ev-judge').value;
+  visit.dealtype = mode === '경매' ? '경매' : document.getElementById('ev-dealtype').value;
+  visit.photos = [...editVisitPhotos, ...editNewPhotos];
+
+  if (mode === '경매') {
+    visit.auction = {
+      case: document.getElementById('ev-case').value,
+      appraise: parseFloat(document.getElementById('ev-appraise').value)||0,
+      minBid: parseFloat(document.getElementById('ev-min-bid').value)||0,
+      erasure: document.getElementById('ev-erasure').value,
+      dividend: document.getElementById('ev-dividend').value,
+      resist: document.getElementById('ev-resist').value,
+      hug: document.getElementById('ev-hug').value,
+      bidDate: document.getElementById('ev-bid-date').value,
+      myBid: parseFloat(document.getElementById('ev-my-bid').value)||0,
+      bidResult: document.getElementById('ev-bid-result').value,
+      winPrice: parseFloat(document.getElementById('ev-win-price').value)||0,
+      bidMemo: document.getElementById('ev-bid-memo').value,
+    };
+  }
+
+  saveData();
+  closeModal('modal-edit-visit');
+  editVisitPhotos = [];
+  editNewPhotos = [];
+  renderVisits();
+}
+
+// ── 물건 수정 모달 열기 ───────────────────────────────────────────
+function openEditProp(propId) {
+  const prop = curGu.props.find(p => String(p.id) === String(propId));
+  if (!prop) return;
+  document.getElementById('edit-prop-id').value = propId;
+  document.getElementById('edit-prop-addr').value = prop.addr;
+  const dtypeEl = document.getElementById('edit-prop-dtype');
+  for (let i = 0; i < dtypeEl.options.length; i++) {
+    if (dtypeEl.options[i].value === prop.dtype) { dtypeEl.selectedIndex = i; break; }
+  }
+  openModal('modal-edit-prop');
+}
+
+function saveEditProp() {
+  const propId = document.getElementById('edit-prop-id').value;
+  const prop = curGu.props.find(p => String(p.id) === String(propId));
+  if (!prop) return;
+  const addr = document.getElementById('edit-prop-addr').value.trim();
+  if (!addr) { alert('주소를 입력해주세요'); return; }
+  prop.addr = addr;
+  prop.dtype = document.getElementById('edit-prop-dtype').value;
+  saveData();
+  closeModal('modal-edit-prop');
+  renderProps();
+}
+
+function deleteProp() {
+  const propId = document.getElementById('edit-prop-id').value;
+  const prop = curGu.props.find(p => String(p.id) === String(propId));
+  if (!prop) return;
+  if (!confirm(`"${prop.addr}" 물건을 삭제할까요?\n방문 기록도 모두 삭제됩니다.`)) return;
+  curGu.props = curGu.props.filter(p => String(p.id) !== String(propId));
+  saveData();
+  closeModal('modal-edit-prop');
+  renderProps();
+}
+
+
+function addVisit() {
+  const mode = document.getElementById('visit-mode').value;
+  const price = parseFloat(document.getElementById('v-price').value)||0;
+  const jeonse = parseFloat(document.getElementById('v-jeonse').value)||0;
+  const propAddr = document.getElementById('v-prop-addr')?.value.trim() || curProp.addr;
+  // 입력한 주소로 물건 주소 자동 업데이트
+  if (propAddr && propAddr !== curProp.addr) { curProp.addr = propAddr; }
+  curProp.visits.push({
+    id: genId(),
+    propAddr: propAddr,
+    date: document.getElementById('v-date').value || new Date().toISOString().slice(0,10),
+    mode, dealtype: mode==='경매'?'경매':document.getElementById('v-dealtype').value,
+    price, jeonse,
+    pub: parseFloat(document.getElementById('v-pub').value)||0,
+    gap: price - jeonse,
+    judge: document.getElementById('v-judge').value,
+    memo: document.getElementById('v-memo').value,
+    photos: [...visitPhotos],
+    auction: mode==='경매' ? {
+      case: document.getElementById('v-case').value,
+      appraise: parseFloat(document.getElementById('v-appraise').value)||0,
+      minBid: parseFloat(document.getElementById('v-min-bid').value)||0,
+      erasure: document.getElementById('v-erasure').value,
+      dividend: document.getElementById('v-dividend').value,
+      resist: document.getElementById('v-resist').value,
+      hug: document.getElementById('v-hug').value,
+      bidDate: document.getElementById('v-bid-date').value,
+      myBid: parseFloat(document.getElementById('v-my-bid').value)||0,
+      bidResult: document.getElementById('v-bid-result').value,
+      winPrice: parseFloat(document.getElementById('v-win-price').value)||0,
+      bidMemo: document.getElementById('v-bid-memo').value,
+    } : {}
+  });
+  saveData(); closeModal('modal-add-visit');
+  visitPhotos = [];
+  ['v-case','v-memo','v-bid-memo'].forEach(id=>document.getElementById(id).value='');
+  ['v-price','v-jeonse','v-pub','v-appraise','v-min-bid','v-my-bid','v-win-price'].forEach(id=>document.getElementById(id).value='');
+  ['v-erasure','v-dividend','v-bid-date'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('v-gap').value='';
+  document.getElementById('v-bid-result').value='';
+  renderVisits();
+}
+
+// ── 백업/불러오기 ────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `redev_v2_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importData(e) {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      if (!parsed.gus) throw new Error();
+      if (!confirm('불러올까요? 기존 데이터를 덮어씁니다.')) return;
+      data = parsed; saveData(); goLevel(0);
+    } catch { alert('올바른 파일이 아닙니다.'); }
+    e.target.value='';
+  };
+  r.readAsText(f);
+}
+
+// 시작: 로컬 데이터로 먼저 화면 표시 (Drive 로드는 로그인 후 onLoginSuccess에서 실행)
+goLevel(0);
+</script>
+</body>
+</html>
