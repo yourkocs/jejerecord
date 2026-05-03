@@ -623,7 +623,14 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
   <!-- 3단계: 물건 상세 -->
   <div id="view-detail" style="display:none">
     <div class="area-box">
-      <div class="area-box-header">📍 지역 개요</div>
+      <div class="area-box-header" style="display:flex;align-items:center;justify-content:space-between">
+        <span>📍 지역 개요</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="detail-addr-text" style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.9)"></span>
+          <a id="detail-asil-link" href="#" target="_blank"
+            style="font-size:11px;padding:3px 10px;background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;text-decoration:none;font-family:var(--sans);white-space:nowrap">🔎 아실에서 보기</a>
+        </div>
+      </div>
       <div class="area-box-body">
 
         <!-- 지도 영역 (좌: 카카오맵 / 우: 구획도) -->
@@ -781,6 +788,12 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 <div class="modal-overlay" id="modal-add-visit">
   <div class="modal">
     <h3 id="visit-modal-title">🏠 방문 기록 추가</h3>
+    <!-- 물건 주소 + 아실 링크 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--accent-light);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px">
+      <span id="v-prop-addr" style="font-size:13px;font-weight:700;color:var(--accent)"></span>
+      <a id="v-asil-link" href="#" target="_blank"
+        style="font-size:11px;padding:3px 10px;background:var(--accent);color:#fff;border-radius:6px;text-decoration:none;font-family:var(--sans);white-space:nowrap">🔎 아실</a>
+    </div>
     <input type="hidden" id="visit-mode" value="일반">
     <div class="field"><label>방문일</label><input type="date" id="v-date"></div>
     <div id="v-normal-type" class="field"><label>매물유형</label>
@@ -860,6 +873,12 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 <div class="modal-overlay" id="modal-edit-visit">
   <div class="modal">
     <h3 id="edit-visit-modal-title">✏️ 방문 기록 수정</h3>
+    <!-- 물건 주소 + 아실 링크 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--accent-light);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px">
+      <span id="ev-prop-addr" style="font-size:13px;font-weight:700;color:var(--accent)"></span>
+      <a id="ev-asil-link" href="#" target="_blank"
+        style="font-size:11px;padding:3px 10px;background:var(--accent);color:#fff;border-radius:6px;text-decoration:none;font-family:var(--sans);white-space:nowrap">🔎 아실</a>
+    </div>
     <input type="hidden" id="edit-visit-id">
     <input type="hidden" id="edit-visit-mode">
     <div class="field"><label>방문일</label><input type="date" id="ev-date"></div>
@@ -1584,6 +1603,13 @@ function renderProps() {
 // ── 3단계 ────────────────────────────────────────────────────────
 function renderDetail() {
   const a = curProp.area || {};
+
+  // 상단 주소 + 아실 링크 업데이트
+  const addrText = document.getElementById('detail-addr-text');
+  const asilLink = document.getElementById('detail-asil-link');
+  if (addrText) addrText.textContent = curGu.name + ' ' + curProp.addr;
+  if (asilLink) asilLink.href = `https://asil.kr/asil/search.jsp?keyword=${encodeURIComponent(curGu.name + ' ' + curProp.addr)}`;
+
   document.getElementById('area-good').value = a.good||'';
   document.getElementById('area-feature').value = a.feature||'';
   document.getElementById('area-price-trade').value = a.priceT||'';
@@ -2352,6 +2378,12 @@ function openAddVisit(mode) {
   document.getElementById('v-auction-fields').style.display = mode==='경매'?'block':'none';
   document.getElementById('v-normal-type').style.display = mode==='경매'?'none':'block';
   document.getElementById('v-date').value = new Date().toISOString().slice(0,10);
+  // 물건 주소 + 아실 링크
+  const fullAddr = curGu.name + ' ' + curProp.addr;
+  const addrEl = document.getElementById('v-prop-addr');
+  const asilEl = document.getElementById('v-asil-link');
+  if (addrEl) addrEl.textContent = fullAddr;
+  if (asilEl) asilEl.href = `https://asil.kr/asil/search.jsp?keyword=${encodeURIComponent(fullAddr)}`;
   openModal('modal-add-visit');
 }
 
@@ -2716,6 +2748,13 @@ function openEditVisit(visitId) {
   document.getElementById('edit-visit-modal-title').textContent = isAuction ? '✏️ 경매 방문 수정' : '✏️ 일반 방문 수정';
   document.getElementById('ev-auction-fields').style.display = isAuction ? 'block' : 'none';
   document.getElementById('ev-normal-type').style.display = isAuction ? 'none' : 'block';
+
+  // 물건 주소 + 아실 링크
+  const fullAddr = curGu.name + ' ' + curProp.addr;
+  const addrEl = document.getElementById('ev-prop-addr');
+  const asilEl = document.getElementById('ev-asil-link');
+  if (addrEl) addrEl.textContent = fullAddr;
+  if (asilEl) asilEl.href = `https://asil.kr/asil/search.jsp?keyword=${encodeURIComponent(fullAddr)}`;
 
   document.getElementById('ev-date').value = visit.date || '';
   document.getElementById('ev-memo').value = visit.memo || '';
