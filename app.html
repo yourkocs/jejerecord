@@ -641,7 +641,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
     <div class="region-tabs" id="region-tabs"></div>
     <!-- 구 버튼 그리드 -->
     <div class="gu-grid" id="gu-grid"></div>
-    <button class="add-card" onclick="openModal('modal-add-gu')">+ 새 구역 추가</button>
+
   </div>
 
   <!-- 2단계: 물건 목록 -->
@@ -1743,9 +1743,18 @@ function renderGuGrid() {
 }
 
 function openNewGuModal(name) {
-  document.getElementById('new-gu-name').value = name;
-  document.getElementById('new-gu-memo').value = '';
-  openModal('modal-add-gu');
+  // 구 자동 생성
+  let gu = data.gus.find(g => g.name === name);
+  if (!gu) {
+    gu = { id: genId(), name, memo: '', props: [] };
+    data.gus.push(gu);
+    saveData();
+  }
+  // 해당 구로 바로 진입
+  curGu = gu;
+  goLevel(1, gu.id);
+  // 물건 추가 모달 바로 열기
+  setTimeout(() => openModal('modal-add-prop'), 200);
 }
 
 // ── 2단계 ────────────────────────────────────────────────────────
@@ -3141,7 +3150,7 @@ function openEditProp(propId) {
 }
 
 function openEditGu(guId) {
-  const gu = data.gus.find(g => g.id === guId);
+  const gu = data.gus.find(g => String(g.id) === String(guId));
   if (!gu) return;
   document.getElementById('edit-gu-id').value = guId;
   document.getElementById('edit-gu-name').value = gu.name;
@@ -3153,7 +3162,7 @@ function saveEditGu() {
   const guId = parseInt(document.getElementById('edit-gu-id').value);
   const name = document.getElementById('edit-gu-name').value.trim();
   if (!name) { alert('구 이름을 입력해주세요'); return; }
-  const gu = data.gus.find(g => g.id === guId);
+  const gu = data.gus.find(g => String(g.id) === String(guId));
   if (!gu) return;
   gu.name = name;
   gu.memo = document.getElementById('edit-gu-memo').value.trim();
@@ -3163,11 +3172,11 @@ function saveEditGu() {
 }
 
 function deleteGu() {
-  const guId = parseInt(document.getElementById('edit-gu-id').value);
-  const gu = data.gus.find(g => g.id === guId);
+  const guIdRaw = document.getElementById('edit-gu-id').value;
+  const gu = data.gus.find(g => String(g.id) === String(guIdRaw));
   if (!gu) return;
   if (!confirm(`"${gu.name}" 구역을 삭제하시겠습니까?\n(해당 구역의 모든 물건과 방문 기록이 삭제됩니다)`)) return;
-  data.gus = data.gus.filter(g => g.id !== guId);
+  data.gus = data.gus.filter(g => String(g.id) !== String(guIdRaw));
   saveData();
   closeModal('modal-edit-gu');
   renderGu();
