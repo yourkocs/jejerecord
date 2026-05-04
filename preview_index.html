@@ -52,7 +52,27 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 .container { max-width: 900px; margin: 0 auto; padding: 16px 14px 40px; }
 
 /* 구 카드 */
-.gu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 10px; margin-bottom: 12px; }
+/* 권역 탭 */
+.region-tabs { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.region-tabs::-webkit-scrollbar { display: none; }
+.region-tab { flex-shrink: 0; padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.region-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.region-tab .tab-count { font-size: 10px; font-weight: 400; opacity: 0.75; margin-left: 4px; }
+
+/* 구 버튼 그리드 */
+.gu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.gu-btn { position: relative; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface); padding: 14px 10px 12px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.gu-btn:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(26,58,143,0.1); transform: translateY(-1px); }
+.gu-btn.has-data { border-color: var(--accent); background: var(--info-light); }
+.gu-btn.empty { opacity: 0.45; }
+.gu-btn-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.gu-btn.has-data .gu-btn-name { color: var(--accent); }
+.gu-btn-stats { font-size: 11px; color: var(--text3); }
+.gu-btn.has-data .gu-btn-stats { color: var(--info); font-weight: 600; }
+.gu-btn-edit { position: absolute; top: 6px; right: 6px; background: rgba(26,58,143,0.1); color: var(--accent); border: none; border-radius: 5px; padding: 2px 6px; font-size: 10px; cursor: pointer; font-family: var(--sans); display: none; }
+.gu-btn.has-data:hover .gu-btn-edit { display: block; }
+.gu-btn-auction { position: absolute; top: 6px; left: 6px; font-size: 10px; }
+
 .gu-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; padding: 16px 18px; cursor: pointer; transition: all 0.15s;
@@ -396,7 +416,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 .sec-t { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 8px; margin-top: 12px; }
 
 @media (max-width: 600px) {
-  .gu-grid { grid-template-columns: 1fr 1fr; }
+  .gu-grid { grid-template-columns: repeat(3, 1fr); }
   .num-grid { grid-template-columns: 1fr 1fr; }
   .info-grid { grid-template-columns: 1fr; }
   .profit-input-grid { grid-template-columns: 1fr; }
@@ -617,6 +637,9 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:12px;color:var(--text3)" id="gu-count"></div>
     </div>
+    <!-- 권역 탭 -->
+    <div class="region-tabs" id="region-tabs"></div>
+    <!-- 구 버튼 그리드 -->
     <div class="gu-grid" id="gu-grid"></div>
     <button class="add-card" onclick="openModal('modal-add-gu')">+ 새 구역 추가</button>
   </div>
@@ -1519,7 +1542,7 @@ if (!data.gus.length) {
     }
   ];
   // 로컬에만 저장 (시트에는 올리지 않음 — 시트 기존 데이터 보호)
-  // preview mode: localStorage 저장 비활성화
+  // preview mode
 }
 
 // ── Google Drive 연동 ────────────────────────────────────────────
@@ -1540,7 +1563,7 @@ async function loadFromDrive() {
     const json = await res.json();
     if (json && json.gus && json.gus.length > 0) {
       data = json;
-      // preview mode: localStorage 저장 비활성화
+      // preview mode
       setStatus('✅ 드라이브 데이터 로드 완료', 'rgba(150,220,255,0.95)');
       goLevel(0);
       renderNotices();
@@ -1597,9 +1620,8 @@ async function forceSaveToDrive() {
 
 
 // 저장 — 로컬 즉시 + 클라우드 1초 디바운스
-function saveData() { return; // preview mode
-  void(function(){
-  // preview mode: localStorage 저장 비활성화
+function saveData() {
+  // preview mode
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveToDrive(), 1500); // 1.5초 디바운스 후 드라이브 자동저장
 }
@@ -1632,27 +1654,100 @@ function goLevel(lv, guId, propId) {
 }
 
 // ── 1단계 ────────────────────────────────────────────────────────
+// 권역 정의
+const REGIONS = {
+  '전체': null,
+  '도심': ['종로구','중구','용산구'],
+  '동북': ['성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구'],
+  '서북': ['은평구','서대문구','마포구'],
+  '서남': ['양천구','강서구','구로구','금천구','영등포구','동작구','관악구'],
+  '동남': ['서초구','강남구','송파구','강동구']
+};
+
+let curRegion = '전체';
+
 function renderGu() {
-  const grid = document.getElementById('gu-grid');
   const tp = data.gus.reduce((s,g)=>s+g.props.length,0);
   document.getElementById('gu-count').textContent = `구역 ${data.gus.length}개 · 물건 ${tp}건`;
-  grid.innerHTML = data.gus.map(g => {
-    const tv = g.props.reduce((s,p)=>s+p.visits.length,0);
-    return `<div class="gu-card" onclick="goLevel(1,${g.id})">
-      <div class="gu-icon">📍</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-        <div class="gu-name" style="flex:1">${g.name}</div>
-        <button onclick="event.stopPropagation();openEditGu(${g.id})"
-          style="background:var(--info-light);color:var(--info);border:1px solid #c5d4f0;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);white-space:nowrap;flex-shrink:0">✏️ 수정</button>
-      </div>
-      <div class="gu-meta">${g.memo||''}</div>
-      <div class="gu-stats">
-        <span class="gu-stat">물건 ${g.props.length}</span>
-        <span class="gu-stat">방문 ${tv}회</span>
-      </div>
+  renderRegionTabs();
+  renderGuGrid();
+  checkBidDateAlerts();
+}
+
+function renderRegionTabs() {
+  const tabEl = document.getElementById('region-tabs');
+  tabEl.innerHTML = Object.keys(REGIONS).map(r => {
+    // 해당 권역에 데이터 있는 구 수
+    const guNames = REGIONS[r];
+    const count = guNames
+      ? data.gus.filter(g => guNames.includes(g.name)).length
+      : data.gus.length;
+    return `<button class="region-tab ${curRegion===r?'active':''}" onclick="setRegion('${r}')">
+      ${r}${count>0?`<span class="tab-count">${count}</span>`:''}
+    </button>`;
+  }).join('');
+}
+
+function setRegion(r) {
+  curRegion = r;
+  renderRegionTabs();
+  renderGuGrid();
+}
+
+function renderGuGrid() {
+  const grid = document.getElementById('gu-grid');
+  const guNames = REGIONS[curRegion];
+
+  // 표시할 구 목록: 전체면 등록된 구만, 권역이면 25개 구 전부 표시
+  let guList;
+  if (!guNames) {
+    // 전체: 등록된 구만
+    guList = data.gus.map(g => ({ name: g.name, gu: g }));
+  } else {
+    // 권역: 해당 권역 모든 구 표시 (등록 안된 구는 empty)
+    guList = guNames.map(name => ({
+      name,
+      gu: data.gus.find(g => g.name === name) || null
+    }));
+  }
+
+  if (!guList.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 0;color:var(--text3);font-size:13px">등록된 구역이 없어요</div>`;
+    return;
+  }
+
+  grid.innerHTML = guList.map(({name, gu}) => {
+    if (!gu) {
+      // 미등록 구
+      return `<div class="gu-btn empty" onclick="openNewGuModal('${name}')">
+        <div class="gu-btn-name">${name}</div>
+        <div class="gu-btn-stats">+ 추가</div>
+      </div>`;
+    }
+    const tv = gu.props.reduce((s,p)=>s+p.visits.length,0);
+    // 경매 D-day 확인
+    const today = new Date(); today.setHours(0,0,0,0);
+    let auctionBadge = '';
+    gu.props.forEach(p => p.visits.forEach(v => {
+      if (v.mode==='경매' && v.auction?.bidDate && !v.auction?.bidResult) {
+        const bid = new Date(v.auction.bidDate); bid.setHours(0,0,0,0);
+        const diff = Math.round((bid-today)/86400000);
+        if (diff >= 0 && diff <= 7) auctionBadge = `<span class="gu-btn-auction">⚖️</span>`;
+      }
+    }));
+    return `<div class="gu-btn has-data" onclick="goLevel(1,${gu.id})">
+      ${auctionBadge}
+      <button class="gu-btn-edit" onclick="event.stopPropagation();openEditGu(${gu.id})">✏️</button>
+      <div class="gu-btn-name">${gu.name}</div>
+      <div class="gu-btn-stats">물건 ${gu.props.length}건 · 방문 ${tv}회</div>
     </div>`;
   }).join('');
-  checkBidDateAlerts();
+}
+
+function openNewGuModal(name) {
+  document.getElementById('new-gu-name').value = name;
+  document.getElementById('new-gu-memo').value = '';
+  openModal('modal-add-gu');
 }
 
 // ── 2단계 ────────────────────────────────────────────────────────
@@ -3066,7 +3161,7 @@ function saveEditGu() {
   gu.memo = document.getElementById('edit-gu-memo').value.trim();
   saveData();
   closeModal('modal-edit-gu');
-  renderGus();
+  renderGu();
 }
 
 function deleteGu() {
@@ -3077,7 +3172,7 @@ function deleteGu() {
   data.gus = data.gus.filter(g => g.id !== guId);
   saveData();
   closeModal('modal-edit-gu');
-  renderGus();
+  renderGu();
 }
 
 function saveEditProp() {
