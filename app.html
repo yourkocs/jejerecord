@@ -463,18 +463,8 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
     <div class="login-title">재개발 투자 분석기</div>
     <div class="login-sub" style="margin-bottom:20px">구글 계정으로 로그인 또는 회원가입</div>
     <div id="g_id_signin"></div>
-    <div style="margin-top:10px;font-size:11px;color:#9e9b93">
+    <div style="margin-top:14px;font-size:11px;color:#9e9b93">
       처음 방문이라면 구글 로그인 후 회원가입을 진행합니다
-    </div>
-    <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
-      <button onclick="window.location.href='preview_index.html'"
-        style="width:100%;padding:11px;background:#f0efe9;color:#1a3a8f;border:1.5px solid #c8d4f0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-        🔍 로그인 없이 둘러보기
-      </button>
-    </div>
-    <div style="margin-top:14px;padding:10px 14px;background:#e8edf8;border-radius:8px;font-size:11px;color:#1a3a8f;line-height:1.7;text-align:left">
-      💡 <b>회원가입 방법</b><br>
-      위 구글 버튼으로 로그인하면<br>자동으로 회원가입 신청이 진행됩니다
     </div>
   </div>
 
@@ -507,7 +497,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
     </button>
   </div>
 
-  <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,0.4)">made by Jinahyoon · v0.01</div>
+  <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,0.4)">made by Jinahyoon · v0.02</div>
 </div>
 
 <!-- 관리자 모달 -->
@@ -529,7 +519,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 </div>
 
 <!-- 서명 -->
-<div class="signature">made by Jinahyoon</div>
+<div class="signature">made by Jinahyoon · v0.02</div>
 
 <div class="header">
   <div>
@@ -754,6 +744,23 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
     <div class="btn-row" style="justify-content:flex-end">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-gu')">취소</button>
       <button class="btn btn-primary" onclick="addGu()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 구역 수정 모달 -->
+<div class="modal-overlay" id="modal-edit-gu">
+  <div class="modal">
+    <h3>✏️ 구역 수정</h3>
+    <input type="hidden" id="edit-gu-id">
+    <div class="field"><label>구 이름</label><input type="text" id="edit-gu-name" placeholder="예) 중랑구"></div>
+    <div class="field"><label>메모</label><input type="text" id="edit-gu-memo" placeholder="예) 모아타운 집중 조사"></div>
+    <div class="btn-row" style="justify-content:space-between">
+      <button class="btn" onclick="deleteGu()" style="background:var(--danger-light);color:var(--danger);border:1px solid #f0c8c8">🗑 구역 삭제</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-edit-gu')">취소</button>
+        <button class="btn btn-primary" onclick="saveEditGu()">저장</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1585,7 +1592,11 @@ function renderGu() {
     const tv = g.props.reduce((s,p)=>s+p.visits.length,0);
     return `<div class="gu-card" onclick="goLevel(1,${g.id})">
       <div class="gu-icon">📍</div>
-      <div class="gu-name">${g.name}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <div class="gu-name" style="flex:1">${g.name}</div>
+        <button onclick="event.stopPropagation();openEditGu(${g.id})"
+          style="background:var(--info-light);color:var(--info);border:1px solid #c5d4f0;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);white-space:nowrap;flex-shrink:0">✏️ 수정</button>
+      </div>
       <div class="gu-meta">${g.memo||''}</div>
       <div class="gu-stats">
         <span class="gu-stat">물건 ${g.props.length}</span>
@@ -2986,6 +2997,39 @@ function openEditProp(propId) {
     if (dtypeEl.options[i].value === prop.dtype) { dtypeEl.selectedIndex = i; break; }
   }
   openModal('modal-edit-prop');
+}
+
+function openEditGu(guId) {
+  const gu = data.gus.find(g => g.id === guId);
+  if (!gu) return;
+  document.getElementById('edit-gu-id').value = guId;
+  document.getElementById('edit-gu-name').value = gu.name;
+  document.getElementById('edit-gu-memo').value = gu.memo || '';
+  openModal('modal-edit-gu');
+}
+
+function saveEditGu() {
+  const guId = parseInt(document.getElementById('edit-gu-id').value);
+  const name = document.getElementById('edit-gu-name').value.trim();
+  if (!name) { alert('구 이름을 입력해주세요'); return; }
+  const gu = data.gus.find(g => g.id === guId);
+  if (!gu) return;
+  gu.name = name;
+  gu.memo = document.getElementById('edit-gu-memo').value.trim();
+  saveData();
+  closeModal('modal-edit-gu');
+  renderGus();
+}
+
+function deleteGu() {
+  const guId = parseInt(document.getElementById('edit-gu-id').value);
+  const gu = data.gus.find(g => g.id === guId);
+  if (!gu) return;
+  if (!confirm(`"${gu.name}" 구역을 삭제하시겠습니까?\n(해당 구역의 모든 물건과 방문 기록이 삭제됩니다)`)) return;
+  data.gus = data.gus.filter(g => g.id !== guId);
+  saveData();
+  closeModal('modal-edit-gu');
+  renderGus();
 }
 
 function saveEditProp() {
