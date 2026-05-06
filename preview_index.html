@@ -1712,16 +1712,29 @@ function setStatus(msg, color='var(--text3)') {
 
 // ── 드라이브에서 데이터 불러오기 ──────────────────────────────────
 async function loadFromDrive() {
-  return; // preview
+  setStatus('☁️ 드라이브 불러오는 중...', 'var(--info)');
   try {
     const res = await fetch(GAS_URL + '?action=load&t=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     if (json && json.gus && json.gus.length > 0) {
+      // 현재 보고 있는 위치 기억
+      const prevGuId   = curGu   ? curGu.id   : null;
+      const prevPropId = curProp ? curProp.id  : null;
+      const prevLevel  = curProp ? 2 : curGu ? 1 : 0;
+
       data = json;
       // preview: localStorage skip
       setStatus('✅ 드라이브 데이터 로드 완료', 'rgba(150,220,255,0.95)');
-      goLevel(0);
+
+      // 현재 위치 복원 (튕기지 않도록)
+      if (prevLevel === 2 && prevGuId && prevPropId) {
+        goLevel(2, prevGuId, prevPropId);
+      } else if (prevLevel === 1 && prevGuId) {
+        goLevel(1, prevGuId);
+      } else {
+        goLevel(0);
+      }
       renderNotices();
       checkBidDateAlerts();
     } else {
