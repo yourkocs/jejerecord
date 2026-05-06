@@ -497,6 +497,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
   font-family: var(--mono); letter-spacing: 0.03em;
   pointer-events: none; z-index: 10;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -1373,6 +1374,18 @@ function tryRestoreSession() {
   } catch(e) { sessionStorage.removeItem('jejeUser'); return false; }
 }
 
+function restorePosition() {
+  try {
+    const pos = JSON.parse(sessionStorage.getItem('jejePos') || 'null');
+    if (!pos) return;
+    if (pos.level === 2 && pos.guId && pos.propId) {
+      goLevel(2, pos.guId, pos.propId);
+    } else if (pos.level === 1 && pos.guId) {
+      goLevel(1, pos.guId);
+    }
+  } catch(e) {}
+}
+
 // ── 로그아웃 ─────────────────────────────────────────────────────
 function signOut() {
   if (!confirm('로그아웃 하시겠습니까?')) return;
@@ -1717,10 +1730,33 @@ async function loadFromDrive() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
     if (json && json.gus && json.gus.length > 0) {
+      // 현재 위치 기억 (메모리 우선, 없으면 sessionStorage)
+      let prevGuId, prevPropId, prevLevel;
+      if (curGu || curProp) {
+        prevGuId   = curGu   ? curGu.id   : null;
+        prevPropId = curProp ? curProp.id  : null;
+        prevLevel  = curProp ? 2 : curGu ? 1 : 0;
+      } else {
+        try {
+          const pos = JSON.parse(sessionStorage.getItem('jejePos') || 'null');
+          prevGuId   = pos?.guId   || null;
+          prevPropId = pos?.propId || null;
+          prevLevel  = pos?.level  || 0;
+        } catch(e) { prevLevel = 0; }
+      }
+
       data = json;
       try { localStorage.setItem('redev_v2', JSON.stringify(data)); } catch(e){}
       setStatus('✅ 드라이브 데이터 로드 완료', 'rgba(150,220,255,0.95)');
-      goLevel(0);
+
+      // 현재 위치 복원 (튕기지 않도록)
+      if (prevLevel === 2 && prevGuId && prevPropId) {
+        goLevel(2, prevGuId, prevPropId);
+      } else if (prevLevel === 1 && prevGuId) {
+        goLevel(1, prevGuId);
+      } else {
+        goLevel(0);
+      }
       renderNotices();
       checkBidDateAlerts();
     } else {
@@ -1779,6 +1815,14 @@ function saveData() {
   try { localStorage.setItem('redev_v2', JSON.stringify(data)); } catch(e){}
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveToDrive(), 1500); // 1.5초 디바운스 후 드라이브 자동저장
+  // 현재 위치 저장 (새로고침 복원용)
+  try {
+    sessionStorage.setItem('jejePos', JSON.stringify({
+      guId:   curGu   ? curGu.id   : null,
+      propId: curProp ? curProp.id  : null,
+      level:  curProp ? 2 : curGu ? 1 : 0
+    }));
+  } catch(e) {}
 }
 function fmt(v) { return v ? Math.round(v).toLocaleString('ko-KR') : '-'; }
 function genId() { return Date.now() + Math.random(); }
@@ -1787,6 +1831,10 @@ function judgeClass(j) { return j==='pass'?'g':j==='hold'?'y':j==='fail'?'r':'n'
 
 // ── 네비게이션 ────────────────────────────────────────────────────
 function goLevel(lv, guId, propId) {
+  // 위치 저장
+  try {
+    sessionStorage.setItem('jejePos', JSON.stringify({ guId: guId||null, propId: propId||null, level: lv }));
+  } catch(e) {}
   ['view-gu','view-prop','view-detail'].forEach((id,i) =>
     document.getElementById(id).style.display = i===lv?'block':'none'
   );
