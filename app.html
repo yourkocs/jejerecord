@@ -2035,17 +2035,15 @@ function renderDetail() {
   const naverLink = document.getElementById('detail-link-naver');
   const naverLandLink = document.getElementById('detail-link-naver-land');
   const fullAddr = curGu.name + ' ' + curProp.addr;
-  const enc = encodeURIComponent(fullAddr);
-  const addrEnc = encodeURIComponent(curProp.addr);
   if (addrText) addrText.textContent = fullAddr;
-  if (naverLink) naverLink.href = `https://map.naver.com/v5/search/${enc}`;
+  if (naverLink) naverLink.href = `https://map.naver.com/v5/search/${encodeURIComponent(fullAddr)}`;
 
   const gongsiga = document.getElementById('detail-link-gongsiga');
-  if (gongsiga) gongsiga.href = `https://www.realtyprice.kr/notice/town/townSiseAction.php?siteId=pc&sido=&gugun=&dong=${addrEnc}&whichPrice=1`;
+  if (gongsiga) gongsiga.href = 'https://www.realtyprice.kr';
   const richgo = document.getElementById('detail-link-richgo');
-  if (richgo) richgo.href = `https://richgo.ai/search?q=${enc}`;
+  if (richgo) richgo.href = 'https://richgo.ai';
   const asil = document.getElementById('detail-link-asil');
-  if (asil) asil.href = `https://asil.kr/asil/sub/apt/search.asp?searchVal=${enc}`;
+  if (asil) asil.href = 'https://asil.kr';
 
   document.getElementById('area-good').value = a.good||'';
   document.getElementById('area-feature').value = a.feature||'';
@@ -2826,26 +2824,18 @@ function updateEditVisitAsilLink() { updateVisitLinks('ev'); }
 function updateVisitLinks(prefix) {
   const addr = document.getElementById(prefix + '-prop-addr')?.value.trim() || '';
   const fullAddr = curGu ? curGu.name + ' ' + addr : addr;
-  const enc = encodeURIComponent(fullAddr);
-  const addrEnc = encodeURIComponent(addr);
 
   const naverEl = document.getElementById(prefix + '-link-naver');
-  if (naverEl) naverEl.href = addr ? `https://map.naver.com/v5/search/${enc}` : '#';
+  if (naverEl) naverEl.href = addr ? `https://map.naver.com/v5/search/${encodeURIComponent(fullAddr)}` : '#';
 
   const gongsigaEl = document.getElementById(prefix + '-link-gongsiga');
-  if (gongsigaEl) gongsigaEl.href = addr
-    ? `https://www.realtyprice.kr/notice/town/townSiseAction.php?siteId=pc&sido=&gugun=&dong=${addrEnc}&whichPrice=1`
-    : '#';
+  if (gongsigaEl) gongsigaEl.href = 'https://www.realtyprice.kr';
 
   const richgoEl = document.getElementById(prefix + '-link-richgo');
-  if (richgoEl) richgoEl.href = addr
-    ? `https://richgo.ai/search?q=${enc}`
-    : '#';
+  if (richgoEl) richgoEl.href = 'https://richgo.ai';
 
   const asilEl = document.getElementById(prefix + '-link-asil');
-  if (asilEl) asilEl.href = addr
-    ? `https://asil.kr/asil/sub/apt/search.asp?searchVal=${enc}`
-    : '#';
+  if (asilEl) asilEl.href = 'https://asil.kr';
 }
 
 function copyAddr(inputId) {
