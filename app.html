@@ -684,6 +684,21 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
       <div id="bid-alert-list" style="display:none"></div>
     </div>
 
+    <!-- 아깝게 놓친 물건 섹션 -->
+    <div id="bid-lost-section" style="display:none;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px;font-weight:700;color:var(--text)">😤 아깝게 놓친 물건</span>
+          <span id="bid-lost-count" style="font-size:11px;color:var(--text3)"></span>
+        </div>
+        <button onclick="toggleLostList()" id="bid-lost-toggle"
+          style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:var(--sans)">
+          펼치기 ▾
+        </button>
+      </div>
+      <div id="bid-lost-list" style="display:none"></div>
+    </div>
+
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:12px;color:var(--text3)" id="gu-count"></div>
     </div>
@@ -2971,48 +2986,77 @@ let curBidFilter = null;
 function checkBidDateAlerts() {
   const today = new Date(); today.setHours(0,0,0,0);
   bidAlerts = [];
+  const lostItems = []; // 낙찰 실패(타인 낙찰) 별도 수집
+
   data.gus.forEach(gu => {
     gu.props.forEach(prop => {
       prop.visits.forEach(visit => {
         if (visit.mode !== '경매' || !visit.auction?.bidDate) return;
-        if (visit.auction.bidResult) return;
+
+        // 낙찰결과가 입력된 건은 알리미에서 제외
+        if (visit.auction.bidResult) {
+          // lose(타인 낙찰)만 "놓친 물건" 섹션으로
+          if (visit.auction.bidResult === 'lose') {
+            lostItems.push({ gu, prop, visit });
+          }
+          return;
+        }
+
         const bid = new Date(visit.auction.bidDate); bid.setHours(0,0,0,0);
         const diff = Math.round((bid - today) / (1000*60*60*24));
+        // 기일이 지나도 결과 미입력이면 알리미에 유지 (diff < 0 포함)
         bidAlerts.push({ gu, prop, visit, diff });
       });
     });
   });
 
+  // ── 경매 알리미 (미결 물건) ──
   const section = document.getElementById('bid-alert-section');
-  if (!section) return;
-  if (!bidAlerts.length) { section.style.display = 'none'; return; }
+  if (section) {
+    // 미결 물건 중 기일 안 지난 것만 표시 (기일 지났는데 결과 없는 건 숨김)
+    const pendingAlerts = bidAlerts.filter(a => a.diff >= 0);
+    if (!pendingAlerts.length) {
+      section.style.display = 'none';
+    } else {
+      bidAlerts = pendingAlerts; // 기일 지난 미결 건은 알리미에서도 제외
+      section.style.display = 'block';
+      const countEl = document.getElementById('bid-alert-count');
+      if (countEl) countEl.textContent = `총 ${bidAlerts.length}건`;
 
-  bidAlerts.sort((a, b) => a.diff - b.diff);
-  section.style.display = 'block';
-  const countEl = document.getElementById('bid-alert-count');
-  if (countEl) countEl.textContent = `총 ${bidAlerts.length}건`;
+      bidAlerts.sort((a, b) => a.diff - b.diff);
 
-  // 카운트 업데이트
-  const urgent = bidAlerts.filter(a => a.diff >= 0 && a.diff <= 7).length;
-  const month  = bidAlerts.filter(a => a.diff > 7 && a.diff <= 30).length;
-  const later  = bidAlerts.filter(a => a.diff > 30).length;
-  document.getElementById('bid-count-urgent').textContent = urgent;
-  document.getElementById('bid-count-month').textContent  = month;
-  document.getElementById('bid-count-later').textContent  = later;
+      const urgent = bidAlerts.filter(a => a.diff <= 7).length;
+      const month  = bidAlerts.filter(a => a.diff > 7 && a.diff <= 30).length;
+      const later  = bidAlerts.filter(a => a.diff > 30).length;
+      document.getElementById('bid-count-urgent').textContent = urgent;
+      document.getElementById('bid-count-month').textContent  = month;
+      document.getElementById('bid-count-later').textContent  = later;
 
-  // 그리드 강조 (건수 있는 것만)
-  document.getElementById('bid-grid-urgent').style.opacity = urgent ? '1' : '0.4';
-  document.getElementById('bid-grid-month').style.opacity  = month  ? '1' : '0.4';
-  document.getElementById('bid-grid-later').style.opacity  = later  ? '1' : '0.4';
+      document.getElementById('bid-grid-urgent').style.opacity = urgent ? '1' : '0.4';
+      document.getElementById('bid-grid-month').style.opacity  = month  ? '1' : '0.4';
+      document.getElementById('bid-grid-later').style.opacity  = later  ? '1' : '0.4';
 
-  // 목록은 닫힌 상태 유지
-  document.getElementById('bid-alert-list').style.display = 'none';
-  curBidFilter = null;
+      document.getElementById('bid-alert-list').style.display = 'none';
+      curBidFilter = null;
+    }
+  }
+
+  // ── 아깝게 놓친 물건 섹션 ──
+  const lostSection = document.getElementById('bid-lost-section');
+  if (lostSection) {
+    if (!lostItems.length) {
+      lostSection.style.display = 'none';
+    } else {
+      lostSection.style.display = 'block';
+      const countEl = document.getElementById('bid-lost-count');
+      if (countEl) countEl.textContent = `${lostItems.length}건`;
+      renderLostList(lostItems);
+    }
+  }
 }
 
 function toggleBidList(filter) {
   const list = document.getElementById('bid-alert-list');
-  // 같은 탭 재클릭 시 닫기
   if (curBidFilter === filter) {
     list.style.display = 'none';
     curBidFilter = null;
@@ -3022,12 +3066,10 @@ function toggleBidList(filter) {
   curBidFilter = filter;
   resetBidGridStyle();
 
-  // 선택된 그리드 강조
   const idMap = { urgent: 'bid-grid-urgent', month: 'bid-grid-month', later: 'bid-grid-later' };
   const el = document.getElementById(idMap[filter]);
   if (el) { el.style.outline = '2px solid var(--accent)'; el.style.outlineOffset = '1px'; }
 
-  // 필터링
   let filtered;
   if (filter === 'urgent') filtered = bidAlerts.filter(a => a.diff >= 0 && a.diff <= 7);
   else if (filter === 'month') filtered = bidAlerts.filter(a => a.diff > 7 && a.diff <= 30);
@@ -3048,8 +3090,7 @@ function toggleBidList(filter) {
     } else {
       ddayLabel = `D-${diff}`; bgColor = 'var(--surface)'; borderColor = 'var(--border)'; textColor = 'var(--text2)';
     }
-    const rate = auc.myBid && auc.appraise
-      ? ` · 입찰률 ${(auc.myBid/auc.appraise*100).toFixed(1)}%` : '';
+    const rate = auc.myBid && auc.appraise ? ` · 입찰률 ${(auc.myBid/auc.appraise*100).toFixed(1)}%` : '';
     return `<div onclick="goLevel(2,${gu.id},${prop.id})"
       style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:11px 14px;margin-bottom:7px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px"
       onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
@@ -3074,6 +3115,65 @@ function resetBidGridStyle() {
 }
 
 function createBidAlertContainer() { return null; } // 레거시 호환용
+
+let lostListOpen = false;
+
+function toggleLostList() {
+  const list = document.getElementById('bid-lost-list');
+  const btn  = document.getElementById('bid-lost-toggle');
+  lostListOpen = !lostListOpen;
+  list.style.display = lostListOpen ? 'block' : 'none';
+  btn.textContent = lostListOpen ? '접기 ▴' : '펼치기 ▾';
+}
+
+function renderLostList(items) {
+  const list = document.getElementById('bid-lost-list');
+  if (!list) return;
+
+  // 기일 최신순 정렬
+  items.sort((a, b) => new Date(b.visit.auction.bidDate) - new Date(a.visit.auction.bidDate));
+
+  list.innerHTML = items.map(({ gu, prop, visit }) => {
+    const auc = visit.auction;
+    const myBid   = auc.myBid   || 0;
+    const winPrice = auc.winPrice || 0;
+    const diff = myBid && winPrice ? winPrice - myBid : null; // 양수 = 낙찰가가 내 입찰보다 높음
+    const diffLabel = diff !== null
+      ? (diff > 0
+          ? `<span style="color:#c0392b;font-weight:700">낙찰가가 내 입찰보다 ${fmt(diff)}만 높음</span>`
+          : `<span style="color:#2e7d32;font-weight:700">내 입찰이 낙찰가보다 ${fmt(Math.abs(diff))}만 높았음</span>`)
+      : '';
+    const rate = winPrice && auc.appraise ? `낙찰률 ${(winPrice/auc.appraise*100).toFixed(1)}%` : '';
+    return `<div onclick="goLevel(2,${gu.id},${prop.id})"
+      style="background:#fff8f0;border:1px solid #f5c49a;border-radius:10px;padding:11px 14px;margin-bottom:7px;cursor:pointer"
+      onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+            <span style="font-size:11px;background:#fde8d8;color:#b84a00;padding:1px 7px;border-radius:10px;font-weight:700">🏆 타인 낙찰</span>
+            <span style="font-size:10px;color:var(--text3)">${auc.bidDate}</span>
+            ${auc.case ? `<span style="font-size:10px;color:var(--text3)">${auc.case}</span>` : ''}
+          </div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${gu.name} ${prop.addr}</div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.7">
+            ${myBid ? `내 입찰: <b style="color:var(--info)">${fmt(myBid)}만</b>` : ''}
+            ${winPrice ? ` · 실제 낙찰가: <b style="color:var(--warn)">${fmt(winPrice)}만</b>` : ''}
+            ${rate ? ` · ${rate}` : ''}
+          </div>
+          ${diffLabel ? `<div style="font-size:11px;margin-top:3px">${diffLabel}</div>` : ''}
+          ${auc.bidMemo ? `<div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.6">📝 ${auc.bidMemo}</div>` : ''}
+        </div>
+        ${winPrice ? `<div style="text-align:right;white-space:nowrap">
+          <div style="font-size:14px;font-weight:800;color:var(--warn);font-family:var(--mono)">${fmt(winPrice)}만</div>
+          <div style="font-size:10px;color:var(--text3)">낙찰가</div>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // 열린 상태면 즉시 표시
+  if (lostListOpen) list.style.display = 'block';
+}
 
 
 
