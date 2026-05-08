@@ -660,7 +660,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
         <span id="bid-alert-count" style="font-size:11px;color:var(--text3)"></span>
       </div>
       <!-- 요약 그리드 -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
         <div id="bid-grid-urgent" onclick="toggleBidList('urgent')"
           style="border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;border:1.5px solid #f0c878;background:#fffde7;transition:all 0.15s"
           onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
@@ -678,6 +678,12 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
           onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
           <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--text3)" id="bid-count-later">0</div>
           <div style="font-size:10px;color:var(--text3);margin-top:2px">🗓 한달 이후</div>
+        </div>
+        <div id="bid-grid-past" onclick="toggleBidList('past')"
+          style="border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;border:1.5px solid #9fa8da;background:#e8eaf6;transition:all 0.15s"
+          onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:#3949ab" id="bid-count-past">0</div>
+          <div style="font-size:10px;color:#3949ab;margin-top:2px">📋 결과 미입력</div>
         </div>
       </div>
       <!-- 펼치기 목록 (기본 숨김) -->
@@ -3013,28 +3019,34 @@ function checkBidDateAlerts() {
   // ── 경매 알리미 (미결 물건) ──
   const section = document.getElementById('bid-alert-section');
   if (section) {
-    // 미결 물건 중 기일 안 지난 것만 표시 (기일 지났는데 결과 없는 건 숨김)
-    const pendingAlerts = bidAlerts.filter(a => a.diff >= 0);
-    if (!pendingAlerts.length) {
+    const pendingAlerts = bidAlerts.filter(a => a.diff >= 0);  // 앞으로 있을 것
+    const pastAlerts    = bidAlerts.filter(a => a.diff < 0);   // 기일 지났는데 결과 미입력
+
+    if (!pendingAlerts.length && !pastAlerts.length) {
       section.style.display = 'none';
     } else {
-      bidAlerts = pendingAlerts; // 기일 지난 미결 건은 알리미에서도 제외
       section.style.display = 'block';
+
+      // 전체 카운트는 미결 전체
       const countEl = document.getElementById('bid-alert-count');
       if (countEl) countEl.textContent = `총 ${bidAlerts.length}건`;
 
       bidAlerts.sort((a, b) => a.diff - b.diff);
 
-      const urgent = bidAlerts.filter(a => a.diff <= 7).length;
-      const month  = bidAlerts.filter(a => a.diff > 7 && a.diff <= 30).length;
-      const later  = bidAlerts.filter(a => a.diff > 30).length;
+      const urgent = pendingAlerts.filter(a => a.diff <= 7).length;
+      const month  = pendingAlerts.filter(a => a.diff > 7 && a.diff <= 30).length;
+      const later  = pendingAlerts.filter(a => a.diff > 30).length;
+      const past   = pastAlerts.length;
+
       document.getElementById('bid-count-urgent').textContent = urgent;
       document.getElementById('bid-count-month').textContent  = month;
       document.getElementById('bid-count-later').textContent  = later;
+      document.getElementById('bid-count-past').textContent   = past;
 
       document.getElementById('bid-grid-urgent').style.opacity = urgent ? '1' : '0.4';
       document.getElementById('bid-grid-month').style.opacity  = month  ? '1' : '0.4';
       document.getElementById('bid-grid-later').style.opacity  = later  ? '1' : '0.4';
+      document.getElementById('bid-grid-past').style.opacity   = past   ? '1' : '0.4';
 
       document.getElementById('bid-alert-list').style.display = 'none';
       curBidFilter = null;
@@ -3066,14 +3078,15 @@ function toggleBidList(filter) {
   curBidFilter = filter;
   resetBidGridStyle();
 
-  const idMap = { urgent: 'bid-grid-urgent', month: 'bid-grid-month', later: 'bid-grid-later' };
+  const idMap = { urgent: 'bid-grid-urgent', month: 'bid-grid-month', later: 'bid-grid-later', past: 'bid-grid-past' };
   const el = document.getElementById(idMap[filter]);
   if (el) { el.style.outline = '2px solid var(--accent)'; el.style.outlineOffset = '1px'; }
 
   let filtered;
   if (filter === 'urgent') filtered = bidAlerts.filter(a => a.diff >= 0 && a.diff <= 7);
   else if (filter === 'month') filtered = bidAlerts.filter(a => a.diff > 7 && a.diff <= 30);
-  else filtered = bidAlerts.filter(a => a.diff > 30);
+  else if (filter === 'later') filtered = bidAlerts.filter(a => a.diff > 30);
+  else filtered = bidAlerts.filter(a => a.diff < 0); // past: 기일 지남 + 결과 미입력
 
   if (!filtered.length) { list.style.display = 'none'; return; }
 
@@ -3081,7 +3094,10 @@ function toggleBidList(filter) {
   list.innerHTML = filtered.map(({ gu, prop, visit, diff }) => {
     const auc = visit.auction;
     let ddayLabel, bgColor, borderColor, textColor;
-    if (diff === 0) {
+    if (diff < 0) {
+      ddayLabel = `⬛ D+${Math.abs(diff)}`;
+      bgColor = '#f3f4fc'; borderColor = '#9fa8da'; textColor = '#3949ab';
+    } else if (diff === 0) {
       ddayLabel = '🔴 오늘!'; bgColor = '#fdf0f0'; borderColor = '#e53935'; textColor = '#c0392b';
     } else if (diff === 1) {
       ddayLabel = '🟠 D-1'; bgColor = '#fff3e0'; borderColor = '#fb8c00'; textColor = '#e67e00';
@@ -3091,6 +3107,12 @@ function toggleBidList(filter) {
       ddayLabel = `D-${diff}`; bgColor = 'var(--surface)'; borderColor = 'var(--border)'; textColor = 'var(--text2)';
     }
     const rate = auc.myBid && auc.appraise ? ` · 입찰률 ${(auc.myBid/auc.appraise*100).toFixed(1)}%` : '';
+    const dLabel = diff < 0
+      ? `<div style="font-size:15px;font-weight:800;color:${textColor};font-family:var(--mono);white-space:nowrap;text-align:right">
+           D+${Math.abs(diff)}<br>
+           <span style="font-size:9px;font-weight:500;color:#9fa8da">결과 미입력</span>
+         </div>`
+      : `<div style="font-size:18px;font-weight:800;color:${textColor};font-family:var(--mono);white-space:nowrap">D-${diff}</div>`;
     return `<div onclick="goLevel(2,${gu.id},${prop.id})"
       style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:11px 14px;margin-bottom:7px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px"
       onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
@@ -3102,13 +3124,13 @@ function toggleBidList(filter) {
         <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${gu.name} ${prop.addr}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:1px">${auc.case||'사건번호 미입력'} · 최저 ${fmt(auc.minBid)}만${auc.myBid?` · 내 입찰 ${fmt(auc.myBid)}만${rate}`:''}</div>
       </div>
-      <div style="font-size:18px;font-weight:800;color:${textColor};font-family:var(--mono);white-space:nowrap">D-${diff}</div>
+      ${dLabel}
     </div>`;
   }).join('');
 }
 
 function resetBidGridStyle() {
-  ['bid-grid-urgent','bid-grid-month','bid-grid-later'].forEach(id => {
+  ['bid-grid-urgent','bid-grid-month','bid-grid-later','bid-grid-past'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.style.outline = 'none'; }
   });
