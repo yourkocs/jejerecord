@@ -3271,7 +3271,6 @@ function renderLostList(items) {
 
 function switchTab(tab) {
   const isGu = tab === 'gu';
-  // 탭 스타일
   document.getElementById('tab-gu').style.borderBottomColor = isGu ? 'var(--accent)' : 'transparent';
   document.getElementById('tab-gu').style.color = isGu ? 'var(--accent)' : 'var(--text3)';
   document.getElementById('tab-gu').style.fontWeight = isGu ? '600' : '500';
@@ -3284,8 +3283,13 @@ function switchTab(tab) {
   document.getElementById('view-prop').style.display = 'none';
   document.getElementById('view-detail').style.display = 'none';
   document.getElementById('breadcrumb').style.display = isGu ? 'flex' : 'none';
+  // 플래너 탭에서는 알리미·공지 숨김
+  const hideEls = ['bid-alert-section', 'bid-lost-section', 'notice-section'];
+  hideEls.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isGu ? '' : 'none';
+  });
   if (!isGu) {
-    // 오늘 날짜 기본 설정
     const dateEl = document.getElementById('plan-date');
     if (!dateEl.value) dateEl.value = new Date().toISOString().slice(0, 10);
     renderPlan();
@@ -3426,6 +3430,8 @@ function togglePlanMap() {
   if (planMapOpen) renderPlanKakaoMap();
 }
 
+let planCoords = []; // geocoder 결과 좌표 저장
+
 function renderPlanKakaoMap() {
   if (typeof kakao === 'undefined' || typeof kakao.maps === 'undefined') {
     setTimeout(renderPlanKakaoMap, 500); return;
@@ -3438,15 +3444,13 @@ function renderPlanKakaoMap() {
   const container = document.getElementById('plan-kakao-map');
   const statusEl  = document.getElementById('plan-map-status');
 
-  // 지도 초기화 (항상 새로 그림)
   planMapInstance = new kakao.maps.Map(container, {
     center: new kakao.maps.LatLng(37.5665, 126.9780), level: 8
   });
 
-  // 기존 오버레이 제거
-  planMapOverlays.forEach(o => o.setMap(null));
-  planMapInfowindows.forEach(iw => iw.close());
-  planMapOverlays = []; planMapInfowindows = [];
+  planMapOverlays.forEach(o => { try { o.setMap(null); } catch(e){} });
+  planMapInfowindows.forEach(iw => { try { iw.close(); } catch(e){} });
+  planMapOverlays = []; planMapInfowindows = []; planCoords = [];
 
   const items = plan.items.map(item => {
     const gu   = data.gus.find(g => String(g.id) === String(item.guId));
@@ -3458,115 +3462,136 @@ function renderPlanKakaoMap() {
 
   if (!items.length) return;
 
+  // 슬롯 미리 확보 (인덱스 보장)
+  items.forEach(() => { planCoords.push(null); planMapOverlays.push(null); planMapInfowindows.push(null); });
+
   const geocoder = new kakao.maps.services.Geocoder();
   const bounds   = new kakao.maps.LatLngBounds();
   let resolved   = 0;
-  statusEl.textContent = `주소 변환 중... (0 / ${items.length})`;
+  statusEl.innerHTML = `주소 변환 중... (0 / ${items.length})`;
 
   items.forEach((item, idx) => {
-    const fullAddr = item.gu.name + ' ' + item.prop.addr;
+    const fullAddr  = item.gu.name + ' ' + item.prop.addr;
     const isAuction = item.lv?.mode === '경매';
     const isDone    = item.done;
     const num       = idx + 1;
-
-    // 커스텀 오버레이 색상
-    const bg    = isDone ? '#aab0c8' : isAuction ? '#e67e00' : '#1a3a8f';
-    const label = isAuction ? '⚖' : '🏠';
+    const bg        = isDone ? '#aab0c8' : isAuction ? '#e67e00' : '#1a3a8f';
 
     geocoder.addressSearch(fullAddr, function(result, status) {
       resolved++;
-      statusEl.textContent = `주소 변환 중... (${resolved} / ${items.length})`;
 
       if (status === kakao.maps.services.Status.OK) {
-        const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+        const lat = parseFloat(result[0].y);
+        const lng = parseFloat(result[0].x);
+        const coords = new kakao.maps.LatLng(lat, lng);
+        planCoords[idx] = { lat, lng, addr: item.prop.addr, name: `${num}. ${item.prop.addr}` };
         bounds.extend(coords);
 
         // 번호 커스텀 오버레이
         const overlayContent = `
-          <div style="
-            display:flex;flex-direction:column;align-items:center;
-            cursor:pointer;transform:translateX(-50%);
-          " onclick="openPlanMarkerInfo(${idx})">
-            <div style="
-              width:32px;height:32px;border-radius:50%;
-              background:${bg};color:#fff;
-              font-size:13px;font-weight:800;
-              display:flex;align-items:center;justify-content:center;
-              border:2px solid #fff;
-              box-shadow:0 2px 6px rgba(0,0,0,0.35);
-              font-family:'Noto Sans KR',sans-serif;
-            ">${num}</div>
-            <div style="
-              width:0;height:0;
-              border-left:5px solid transparent;
-              border-right:5px solid transparent;
-              border-top:7px solid ${bg};
-              margin-top:-1px;
-            "></div>
+          <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:translateX(-50%)"
+               onclick="openPlanMarkerInfo(${idx})">
+            <div style="width:32px;height:32px;border-radius:50%;background:${bg};color:#fff;
+              font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;
+              border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);
+              font-family:'Noto Sans KR',sans-serif">${num}</div>
+            <div style="width:0;height:0;border-left:5px solid transparent;
+              border-right:5px solid transparent;border-top:7px solid ${bg};margin-top:-1px"></div>
           </div>`;
 
-        const overlay = new kakao.maps.CustomOverlay({
-          position: coords,
-          content: overlayContent,
-          yAnchor: 1.15,
-          zIndex: 3
-        });
+        const overlay = new kakao.maps.CustomOverlay({ position: coords, content: overlayContent, yAnchor: 1.15, zIndex: 3 });
         overlay.setMap(planMapInstance);
-        planMapOverlays.push(overlay);
+        planMapOverlays[idx] = overlay;
 
-        // 말풍선 (InfoWindow)
+        // 말풍선 — 길찾기 버튼 포함
         const auc = item.lv?.auction;
+        const prevIdx = idx - 1;
+        const nextIdx = idx + 1;
+        const routeBtns = `
+          <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+            ${prevIdx >= 0 ? `<button onclick="openKakaoRoute(${prevIdx},${idx})"
+              style="padding:4px 9px;background:#FEE500;color:#3A1D1D;border:none;border-radius:6px;
+              font-size:11px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
+              ← ${prevIdx+1}→${num} 길찾기</button>` : ''}
+            ${nextIdx < items.length ? `<button onclick="openKakaoRoute(${idx},${nextIdx})"
+              style="padding:4px 9px;background:#FEE500;color:#3A1D1D;border:none;border-radius:6px;
+              font-size:11px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
+              ${num}→${nextIdx+1} 길찾기 →</button>` : ''}
+          </div>`;
+
         const iwContent = `
-          <div style="
-            padding:8px 12px;min-width:160px;max-width:220px;
-            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.7;
-          ">
+          <div style="padding:9px 12px;min-width:170px;max-width:230px;
+            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.7">
             <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-              <span style="
-                font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;
-                background:${isAuction ? '#fff8e0' : '#e8edf8'};
-                color:${isAuction ? '#7c5a00' : '#1a3a8f'};
-                border:1px solid ${isAuction ? '#f0c878' : '#1a3a8f'};
-              ">${label} ${isAuction ? '경매' : '일반'}</span>
+              <span style="font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;
+                background:${isAuction?'#fff8e0':'#e8edf8'};
+                color:${isAuction?'#7c5a00':'#1a3a8f'};
+                border:1px solid ${isAuction?'#f0c878':'#1a3a8f'}">
+                ${isAuction?'⚖ 경매':'🏠 일반'}</span>
               <b style="font-size:11px;color:#333">${num}번</b>
             </div>
             <div style="font-weight:700;color:#0f1733;font-size:13px">${item.prop.addr}</div>
             <div style="color:#8890aa;font-size:11px">${item.gu.name} · ${item.prop.dtype}</div>
-            ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-top:2px">🔔 ${auc.bidDate}${auc.case ? ' · ' + auc.case : ''}</div>` : ''}
+            ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-top:2px">🔔 ${auc.bidDate}${auc.case?' · '+auc.case:''}</div>` : ''}
             ${isDone ? '<div style="color:#1a3a8f;font-size:11px;margin-top:2px">✅ 완료</div>' : ''}
+            ${routeBtns}
           </div>`;
 
         const infowindow = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-        planMapInfowindows.push(infowindow);
-
-        // 오버레이 클릭 → 말풍선 토글
-        window[`openPlanMarkerInfo`] = function(i) {
-          planMapInfowindows.forEach((iw, j) => {
-            if (j === i) {
-              if (iw.getMap()) iw.close();
-              else iw.open(planMapInstance, planMapOverlays[i]);
-            } else {
-              iw.close();
-            }
-          });
-        };
+        planMapInfowindows[idx] = infowindow;
       }
 
-      // 모두 완료되면 범위 맞춤
+      statusEl.innerHTML = `주소 변환 중... (${resolved} / ${items.length})`;
+
       if (resolved === items.length) {
-        statusEl.textContent = `📍 총 ${planMapOverlays.length}개 물건 표시됨 · 마커 클릭으로 정보 확인`;
-        if (planMapOverlays.length > 0) {
-          planMapInstance.setBounds(bounds, 60);
-        }
+        const ok = planCoords.filter(Boolean).length;
+        // 하단 상태바 — 전체 동선 길찾기 버튼 포함
+        statusEl.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+            <span>📍 ${ok}개 물건 표시 · 마커 클릭 시 길찾기</span>
+            ${ok >= 2 ? `<button onclick="openKakaoRouteAll()"
+              style="padding:5px 12px;background:#FEE500;color:#3A1D1D;border:none;border-radius:7px;
+              font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
+              🟡 전체 동선 카카오맵 열기</button>` : ''}
+          </div>`;
+        if (ok > 0) planMapInstance.setBounds(bounds, 60);
       }
     });
   });
 }
 
-// 레거시 함수 (URL 방식) — 제거
-function openPlanMapNaver() {}
-function openPlanMapKakao() {}
-function getPlanAddrs() { return []; }
+window.openPlanMarkerInfo = function(i) {
+  planMapInfowindows.forEach((iw, j) => {
+    if (!iw) return;
+    if (j === i) { try { iw.getMap() ? iw.close() : iw.open(planMapInstance, planMapOverlays[i]); } catch(e){} }
+    else { try { iw.close(); } catch(e){} }
+  });
+};
+
+// 두 지점 간 카카오맵 길찾기
+window.openKakaoRoute = function(fromIdx, toIdx) {
+  const from = planCoords[fromIdx];
+  const to   = planCoords[toIdx];
+  if (!from || !to) return;
+  const url = `https://map.kakao.com/?sName=${encodeURIComponent(from.name)}&sX=${from.lng}&sY=${from.lat}&eName=${encodeURIComponent(to.name)}&eX=${to.lng}&eY=${to.lat}&service=`;
+  window.open(url, '_blank');
+};
+
+// 전체 동선 — 1→2→3... 순서로 카카오맵 열기 (경유지 URL)
+window.openKakaoRouteAll = function() {
+  const pts = planCoords.filter(Boolean);
+  if (pts.length < 2) return;
+  const from = pts[0];
+  const to   = pts[pts.length - 1];
+  // 경유지 (최대 5개)
+  const vias = pts.slice(1, -1).slice(0, 5);
+  let url = `https://map.kakao.com/?sName=${encodeURIComponent(from.name)}&sX=${from.lng}&sY=${from.lat}`;
+  vias.forEach((v, i) => {
+    url += `&vName${i?i:''}=${encodeURIComponent(v.name)}&vX${i?i:''}=${v.lng}&vY${i?i:''}=${v.lat}`;
+  });
+  url += `&eName=${encodeURIComponent(to.name)}&eX=${to.lng}&eY=${to.lat}&service=`;
+  window.open(url, '_blank');
+};
 
 // ── 물건 추가 모달 ──────────────────────────────────────────────────
 let planTypeFilter = 'all';
