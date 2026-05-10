@@ -3695,7 +3695,8 @@ function renderPlanKakaoMap() {
   statusEl.innerHTML = `주소 변환 중... (0 / ${items.length})`;
 
   items.forEach((item, idx) => {
-    const searchAddr = item.gu.name + ' ' + item.prop.addr;
+    // 서울특별시 포함 Full 주소로 검색 정확도 향상
+    const searchAddr = '서울특별시 ' + item.gu.name + ' ' + item.prop.addr;
     const isAuction  = item.lv?.mode === '경매';
     const isDone     = item.done;
     const num        = idx + 1;
@@ -3706,7 +3707,6 @@ function renderPlanKakaoMap() {
       if (status === kakao.maps.services.Status.OK) {
         const lat = parseFloat(result[0].y);
         const lng = parseFloat(result[0].x);
-        // Full 주소: geocoder 결과에서 도로명 또는 지번 주소 사용
         const fullAddr = result[0].road_address?.address_name
                       || result[0].address?.address_name
                       || searchAddr;
@@ -3730,11 +3730,15 @@ function renderPlanKakaoMap() {
         overlay.setMap(planMapInstance);
         planMapOverlays[idx] = overlay;
 
-        // 말풍선
+        // 말풍선 — PC/모바일 모두 동작하는 CustomOverlay 방식
         const auc = item.lv?.auction;
-        const iwContent = `
-          <div style="padding:10px 13px;min-width:170px;max-width:230px;
-            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.75">
+        const popupContent = `
+          <div style="position:relative;background:#fff;border-radius:12px;padding:12px 14px;
+            min-width:190px;max-width:240px;box-shadow:0 4px 16px rgba(0,0,0,0.22);
+            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.75;
+            transform:translateX(-50%) translateY(-110%)">
+            <button onclick="closePlanPopup(${idx})" style="position:absolute;top:8px;right:8px;
+              background:none;border:none;font-size:16px;cursor:pointer;color:#aaa;line-height:1">✕</button>
             <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
               <span style="font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;
                 background:${isAuction?'#fff8e0':'#e8edf8'};
@@ -3747,15 +3751,21 @@ function renderPlanKakaoMap() {
             <div style="font-weight:700;color:#0f1733;font-size:13px;margin-bottom:1px">${item.prop.addr}</div>
             <div style="color:#8890aa;font-size:11px;margin-bottom:6px">${item.gu.name} · ${item.prop.dtype}</div>
             ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-bottom:6px">🔔 ${auc.bidDate}${auc.case?' · '+auc.case:''}</div>` : ''}
-            <div style="background:#FEE500;border-radius:8px;padding:9px 12px;margin-top:6px;text-align:center;cursor:pointer"
-              onclick="launchKakaoMap('${encodeURIComponent(fullAddr)}',${lat},${lng})">
+            <div onclick="launchKakaoMap('${encodeURIComponent(fullAddr)}',${lat},${lng})"
+              style="background:#FEE500;border-radius:8px;padding:10px 12px;text-align:center;cursor:pointer">
               <div style="font-size:13px;font-weight:800;color:#3A1D1D">🗺 카카오맵으로 길찾기</div>
               <div style="font-size:10px;color:#5a3a00;margin-top:2px">이 장소를 목적지로 카카오맵이 실행됩니다</div>
             </div>
+            <div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+              width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #fff"></div>
           </div>`;
 
-        const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-        planMapInfowindows[idx] = iw;
+        const popup = new kakao.maps.CustomOverlay({
+          position: coords, content: popupContent,
+          yAnchor: 0, zIndex: 10
+        });
+        popup.setMap(null); // 기본 숨김
+        planMapInfowindows[idx] = popup;
       }
 
       statusEl.innerHTML = `주소 변환 중... (${resolved} / ${items.length})`;
@@ -3769,11 +3779,20 @@ function renderPlanKakaoMap() {
 }
 
 window.openPlanMarkerInfo = function(i) {
-  planMapInfowindows.forEach((iw, j) => {
-    if (!iw) return;
-    if (j === i) { try { iw.getMap() ? iw.close() : iw.open(planMapInstance, planMapOverlays[i]); } catch(e){} }
-    else { try { iw.close(); } catch(e){} }
+  planMapInfowindows.forEach((popup, j) => {
+    if (!popup) return;
+    if (j === i) {
+      // 토글: 표시 중이면 닫고, 아니면 열기
+      if (popup.getMap()) popup.setMap(null);
+      else popup.setMap(planMapInstance);
+    } else {
+      popup.setMap(null);
+    }
   });
+};
+
+window.closePlanPopup = function(i) {
+  if (planMapInfowindows[i]) planMapInfowindows[i].setMap(null);
 };
 
 // 마커 클릭 → 카카오맵 앱 바로 실행 (앱 없으면 웹 폴백)
