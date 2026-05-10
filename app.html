@@ -507,6 +507,25 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 
   <!-- 단계1: 로그인/회원가입 선택 -->
   <div class="login-box" id="ls-main">
+
+    <!-- 카카오 인앱 브라우저 감지 배너 -->
+    <div id="inapp-browser-banner" style="display:none;background:linear-gradient(135deg,#7c3a00,#b85c00);border-radius:12px;padding:14px 16px;margin-bottom:20px;text-align:left">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:20px;flex-shrink:0">⚠️</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:4px">카카오 브라우저에서 열렸습니다</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.8);line-height:1.65;margin-bottom:10px">
+            구글 로그인·지도 기능이 정상동작하지 않을 수 있습니다.<br>
+            아래 버튼을 눌러 <b>Chrome 또는 Safari</b>에서 열어주세요.
+          </div>
+          <button onclick="copyAppUrl()"
+            style="width:100%;padding:10px;background:#fff;color:#7c3a00;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            📋 주소 복사 → Chrome / Safari에서 열기
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="login-logo">🏘</div>
     <div class="login-title">재개발 투자 분석기</div>
     <div class="login-sub" style="margin-bottom:20px">구글 계정으로 로그인 또는 회원가입</div>
@@ -1538,6 +1557,7 @@ function parseJwt(token) {
 }
 
 window.addEventListener('load', () => {
+  checkInAppBrowser();
   if (!tryRestoreSession()) initGoogleLogin();
 });
 
@@ -2961,6 +2981,26 @@ function isPlannerTab() {
   return document.getElementById('view-plan')?.style.display !== 'none';
 }
 
+// 카카오 인앱 브라우저 감지 및 배너 표시
+function checkInAppBrowser() {
+  const ua = navigator.userAgent || '';
+  const isKakao = /KAKAOTALK/i.test(ua);
+  const banner = document.getElementById('inapp-browser-banner');
+  if (banner && isKakao) banner.style.display = 'block';
+}
+
+function copyAppUrl() {
+  const url = window.location.href;
+  const msg = '📋 주소가 복사됐습니다. Chrome 또는 Safari를 열고 주소창에 붙여넣기 하세요.';
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => alert(msg)).catch(() => {
+      prompt('아래 주소를 복사하세요:', url);
+    });
+  } else {
+    prompt('아래 주소를 복사하세요:', url);
+  }
+}
+
 function renderNotices() {
   // 플래너 탭에서는 공지 숨김 유지
   const noticeSection = document.getElementById('notice-section');
@@ -3192,18 +3232,49 @@ function toggleBidList(filter) {
            <span style="font-size:9px;font-weight:500;color:#9fa8da">결과 미입력</span>
          </div>`
       : `<div style="font-size:18px;font-weight:800;color:${textColor};font-family:var(--mono);white-space:nowrap">D-${diff}</div>`;
+
+    // 구글 캘린더 URL
+    const gcalUrl = (function() {
+      if (!auc.bidDate) return '';
+      const d    = auc.bidDate.replace(/-/g,'');
+      const next = new Date(auc.bidDate); next.setDate(next.getDate()+1);
+      const dEnd = next.toISOString().slice(0,10).replace(/-/g,'');
+      const title  = encodeURIComponent(`⚖️ 경매 낙찰기일 — ${gu.name} ${prop.addr}`);
+      const detail = encodeURIComponent(
+        `사건번호: ${auc.case||'미입력'}\n최저가: ${auc.minBid?auc.minBid.toLocaleString()+'만원':'미입력'}${auc.myBid?'\n내 입찰가: '+auc.myBid.toLocaleString()+'만원':''}\n\n재개발 투자 분석기`
+      );
+      return `https://calendar.google.com/calendar/r/eventedit?text=${title}&dates=${d}/${dEnd}&details=${detail}&sf=true`;
+    })();
+
     return `<div onclick="goLevel(2,${gu.id},${prop.id})"
-      style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:11px 14px;margin-bottom:7px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px"
+      style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:11px 14px;margin-bottom:7px;cursor:pointer"
       onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-          <span style="font-size:12px;font-weight:700;color:${textColor}">${ddayLabel}</span>
-          <span style="font-size:10px;color:var(--text3)">${auc.bidDate}</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+            <span style="font-size:12px;font-weight:700;color:${textColor}">${ddayLabel}</span>
+            <span style="font-size:10px;color:var(--text3)">${auc.bidDate}</span>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${gu.name} ${prop.addr}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px">${auc.case||'사건번호 미입력'} · 최저 ${fmt(auc.minBid)}만${auc.myBid?` · 내 입찰 ${fmt(auc.myBid)}만${rate}`:''}</div>
         </div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${gu.name} ${prop.addr}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:1px">${auc.case||'사건번호 미입력'} · 최저 ${fmt(auc.minBid)}만${auc.myBid?` · 내 입찰 ${fmt(auc.myBid)}만${rate}`:''}</div>
+        ${dLabel}
       </div>
-      ${dLabel}
+      ${gcalUrl ? `<div style="margin-top:8px" onclick="event.stopPropagation()">
+        <a href="${gcalUrl}" target="_blank"
+          style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
+            background:#fff;color:#1a73e8;border:1px solid #dadce0;border-radius:7px;
+            font-size:11px;font-weight:700;text-decoration:none;font-family:var(--sans);
+            box-shadow:0 1px 3px rgba(0,0,0,.1)">
+          <svg width="12" height="12" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          구글 캘린더 등록
+        </a>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
