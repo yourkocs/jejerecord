@@ -2956,7 +2956,16 @@ function calcWinRate(prefix) {
 
 // ── 공지사항 ──────────────────────────────────────────────────
 
+// 현재 플래너 탭이 활성화됐는지 확인
+function isPlannerTab() {
+  return document.getElementById('view-plan')?.style.display !== 'none';
+}
+
 function renderNotices() {
+  // 플래너 탭에서는 공지 숨김 유지
+  const noticeSection = document.getElementById('notice-section');
+  if (noticeSection && isPlannerTab()) { noticeSection.style.display = 'none'; return; }
+
   const el = document.getElementById('notice-content');
   if (!el) return;
   if (!data.notices || !data.notices.length) {
@@ -3089,15 +3098,15 @@ function checkBidDateAlerts() {
   // ── 경매 알리미 (미결 물건) ──
   const section = document.getElementById('bid-alert-section');
   if (section) {
-    const pendingAlerts = bidAlerts.filter(a => a.diff >= 0);  // 앞으로 있을 것
-    const pastAlerts    = bidAlerts.filter(a => a.diff < 0);   // 기일 지났는데 결과 미입력
+    const pendingAlerts = bidAlerts.filter(a => a.diff >= 0);
+    const pastAlerts    = bidAlerts.filter(a => a.diff < 0);
 
     if (!pendingAlerts.length && !pastAlerts.length) {
       section.style.display = 'none';
     } else {
-      section.style.display = 'block';
+      // 플래너 탭이 활성화된 상태면 숨김 유지
+      if (!isPlannerTab()) section.style.display = 'block';
 
-      // 전체 카운트는 미결 전체
       const countEl = document.getElementById('bid-alert-count');
       if (countEl) countEl.textContent = `총 ${bidAlerts.length}건`;
 
@@ -3129,7 +3138,7 @@ function checkBidDateAlerts() {
     if (!lostItems.length) {
       lostSection.style.display = 'none';
     } else {
-      lostSection.style.display = 'block';
+      if (!isPlannerTab()) lostSection.style.display = 'block';
       const countEl = document.getElementById('bid-lost-count');
       if (countEl) countEl.textContent = `${lostItems.length}건`;
       renderLostList(lostItems);
@@ -3306,10 +3315,8 @@ function renderPlan() {
   const mapPanel = document.getElementById('plan-map-panel');
 
   if (!plan || !plan.items.length) {
-    list.innerHTML = '';
-    empty.style.display = 'block';
-    summary.textContent = '';
-    mapPanel.style.display = 'none';
+    list.innerHTML = ''; empty.style.display = 'block';
+    summary.textContent = ''; mapPanel.style.display = 'none';
     return;
   }
 
@@ -3317,69 +3324,248 @@ function renderPlan() {
   const done = plan.items.filter(i => i.done).length;
   summary.textContent = `총 ${plan.items.length}곳 · 완료 ${done}곳`;
 
-  // 지도 패널 주소 뱃지 + 지도 갱신
   mapPanel.style.display = 'block';
   const addrListEl = document.getElementById('plan-map-addr-list');
   addrListEl.innerHTML = plan.items.map((item, idx) => {
-    const gu = data.gus.find(g => String(g.id) === String(item.guId));
+    const gu   = data.gus.find(g => String(g.id) === String(item.guId));
     const prop = gu?.props.find(p => String(p.id) === String(item.propId));
     if (!gu || !prop) return '';
-    const lastMode = prop.visits.length ? prop.visits[prop.visits.length-1].mode : '';
-    const isAuction = lastMode === '경매';
+    const isAuction = prop.visits[prop.visits.length-1]?.mode === '경매';
     return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;
-      background:${item.done ? 'var(--surface2)' : isAuction ? 'var(--warn-light)' : 'var(--accent-light)'};
-      color:${item.done ? 'var(--text3)' : isAuction ? 'var(--warn)' : 'var(--accent)'};
-      border:1px solid ${item.done ? 'var(--border)' : isAuction ? '#f0c878' : 'var(--accent)'};
-      text-decoration:${item.done ? 'line-through' : 'none'}">
-      <b>${idx+1}</b> ${prop.addr}
-    </span>`;
+      background:${item.done?'var(--surface2)':isAuction?'var(--warn-light)':'var(--accent-light)'};
+      color:${item.done?'var(--text3)':isAuction?'var(--warn)':'var(--accent)'};
+      border:1px solid ${item.done?'var(--border)':isAuction?'#f0c878':'var(--accent)'};
+      text-decoration:${item.done?'line-through':'none'}">
+      <b>${idx+1}</b> ${prop.addr}</span>`;
   }).join('');
 
-  // 지도가 열려있으면 자동 갱신
   if (planMapOpen) renderPlanKakaoMap();
 
   list.innerHTML = plan.items.map((item, idx) => {
-    const gu = data.gus.find(g => String(g.id) === String(item.guId));
+    const gu   = data.gus.find(g => String(g.id) === String(item.guId));
     const prop = gu?.props.find(p => String(p.id) === String(item.propId));
     if (!gu || !prop) return '';
     const lastVisit = prop.visits[prop.visits.length - 1];
-    const hasVisit = prop.visits.length > 0;
+    const hasVisit  = prop.visits.length > 0;
     const isAuction = lastVisit?.mode === '경매';
-    const auc = lastVisit?.auction;
+    const auc       = lastVisit?.auction;
     const modeBadge = isAuction
       ? `<span style="font-size:10px;background:var(--warn-light);color:var(--warn);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid #f0c878">⚖️ 경매</span>`
       : hasVisit
         ? `<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid var(--accent)">🏠 일반</span>`
         : `<span style="font-size:10px;background:var(--surface2);color:var(--text3);padding:1px 6px;border-radius:10px;border:1px solid var(--border)">미방문</span>`;
     return `
-    <div style="background:var(--surface);border:1px solid ${item.done ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;${item.done ? 'opacity:0.75' : ''}">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+    <div data-idx="${idx}" data-date="${date}" draggable="true"
+      ondragstart="onPlanDragStart(event)" ondragover="onPlanDragOver(event)"
+      ondrop="onPlanDrop(event)" ondragend="onPlanDragEnd(event)"
+      style="background:var(--surface);border:1px solid ${item.done?'var(--accent)':'var(--border)'};
+        border-radius:12px;padding:12px 14px;margin-bottom:10px;
+        display:flex;align-items:center;gap:10px;
+        ${item.done?'opacity:0.75':''}
+        user-select:none;-webkit-user-select:none;transition:box-shadow .15s">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:grab;padding:2px 4px" title="드래그해서 순서 변경">
+        <span style="font-size:16px;color:var(--text3);line-height:1;letter-spacing:-1px">⠿</span>
         <span style="font-size:11px;font-weight:800;color:var(--text3);font-family:var(--mono)">${idx+1}</span>
         <button onclick="togglePlanDone('${date}',${idx})"
-          style="width:24px;height:24px;border-radius:50%;border:2px solid ${item.done ? 'var(--accent)' : 'var(--border)'};background:${item.done ? 'var(--accent)' : 'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff">
-          ${item.done ? '✓' : ''}
+          style="width:22px;height:22px;border-radius:50%;border:2px solid ${item.done?'var(--accent)':'var(--border)'};
+            background:${item.done?'var(--accent)':'transparent'};cursor:pointer;
+            display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff">
+          ${item.done?'✓':''}
         </button>
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
           ${modeBadge}
-          <span style="font-size:15px;font-weight:700;${item.done ? 'text-decoration:line-through;color:var(--text3)' : ''}">${prop.addr}</span>
+          <span style="font-size:14px;font-weight:700;${item.done?'text-decoration:line-through;color:var(--text3)':''}">${prop.addr}</span>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:2px">${gu.name} · ${prop.dtype}</div>
-        ${isAuction && auc?.bidDate ? `<div style="font-size:11px;color:var(--warn);font-weight:600">🔔 낙찰기일: ${auc.bidDate}${auc.case ? ' · ' + auc.case : ''}</div>` : ''}
-        ${lastVisit ? `<div style="font-size:11px;color:var(--text3)">최근 방문: ${lastVisit.date} · ${judgeLabel(lastVisit.judge)}</div>` : '<div style="font-size:11px;color:var(--text3)">방문 기록 없음</div>'}
+        <div style="font-size:11px;color:var(--text3);margin-bottom:1px">${gu.name} · ${prop.dtype}</div>
+        ${isAuction && auc?.bidDate ? `<div style="font-size:11px;color:var(--warn);font-weight:600">🔔 ${auc.bidDate}${auc.case?' · '+auc.case:''}</div>` : ''}
+        ${lastVisit ? `<div style="font-size:11px;color:var(--text3)">방문: ${lastVisit.date} · ${judgeLabel(lastVisit.judge)}</div>` : '<div style="font-size:11px;color:var(--text3)">방문 기록 없음</div>'}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        <button onclick="openPlanRoute(${idx},'${date}')"
+          style="padding:6px 10px;background:#FEE500;color:#3A1D1D;border:none;border-radius:8px;
+            font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;white-space:nowrap">
+          🟡 길찾기
+        </button>
         <button onclick="goToPropFromPlan('${item.guId}','${item.propId}')"
-          style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer">
-          ${hasVisit ? '상세보기' : '기록 입력'} ▶
+          style="padding:5px 10px;background:var(--accent);color:#fff;border:none;border-radius:8px;
+            font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;white-space:nowrap">
+          ${hasVisit?'상세보기':'기록 입력'} ▶
         </button>
         <button onclick="removePlanItem('${date}',${idx})"
-          style="padding:5px 10px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);cursor:pointer">✕ 제거</button>
+          style="padding:4px 10px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);
+            border-radius:8px;font-size:11px;font-family:var(--sans);cursor:pointer">✕ 제거</button>
       </div>
     </div>`;
   }).join('');
+
+  initPlanTouchDrag();
 }
+
+// ── 드래그 앤 드롭 ──────────────────────────────────────────────────
+let dragSrcIdx = null;
+
+function onPlanDragStart(e) {
+  dragSrcIdx = parseInt(e.currentTarget.dataset.idx);
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onPlanDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('#plan-list > div').forEach(el => el.style.boxShadow = '');
+  e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent)';
+}
+function onPlanDragEnd(e) {
+  document.querySelectorAll('#plan-list > div').forEach(el => { el.style.boxShadow = ''; el.style.opacity = ''; });
+}
+function onPlanDrop(e) {
+  e.preventDefault();
+  const toIdx = parseInt(e.currentTarget.dataset.idx);
+  const date  = e.currentTarget.dataset.date;
+  if (dragSrcIdx === null || dragSrcIdx === toIdx) return;
+  const plan = getPlanForDate(date);
+  if (!plan) return;
+  const [moved] = plan.items.splice(dragSrcIdx, 1);
+  plan.items.splice(toIdx, 0, moved);
+  dragSrcIdx = null;
+  saveData(); renderPlan();
+}
+
+// ── 터치 드래그 (모바일) ────────────────────────────────────────────
+function initPlanTouchDrag() {
+  const cards = document.querySelectorAll('#plan-list > div[draggable]');
+  let tSrcIdx = null, lastOver = null;
+  cards.forEach(card => {
+    card.addEventListener('touchstart', e => {
+      tSrcIdx = parseInt(card.dataset.idx);
+      card.style.opacity = '0.4';
+    }, { passive: true });
+    card.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const t = e.touches[0];
+      const els = document.elementsFromPoint(t.clientX, t.clientY);
+      const over = els.find(el => el.dataset?.idx && el !== card);
+      if (over && over !== lastOver) {
+        document.querySelectorAll('#plan-list > div').forEach(el => el.style.boxShadow = '');
+        over.style.boxShadow = '0 0 0 2px var(--accent)';
+        lastOver = over;
+      }
+    }, { passive: false });
+    card.addEventListener('touchend', () => {
+      card.style.opacity = '';
+      document.querySelectorAll('#plan-list > div').forEach(el => el.style.boxShadow = '');
+      if (lastOver?.dataset?.idx !== undefined && tSrcIdx !== null) {
+        const toIdx = parseInt(lastOver.dataset.idx);
+        const date  = card.dataset.date;
+        if (tSrcIdx !== toIdx) {
+          const plan = getPlanForDate(date);
+          if (plan) {
+            const [moved] = plan.items.splice(tSrcIdx, 1);
+            plan.items.splice(toIdx, 0, moved);
+            saveData(); renderPlan();
+          }
+        }
+      }
+      tSrcIdx = null; lastOver = null;
+    }, { passive: true });
+  });
+}
+
+// ── 길찾기 바텀시트 ─────────────────────────────────────────────────
+function openPlanRoute(idx, date) {
+  const plan = getPlanForDate(date);
+  if (!plan) return;
+  const item = plan.items[idx];
+  const gu   = data.gus.find(g => String(g.id) === String(item.guId));
+  const prop = gu?.props.find(p => String(p.id) === String(item.propId));
+  if (!gu || !prop) return;
+  const dest      = `${gu.name} ${prop.addr}`;
+  const destCoord = planCoords[idx];
+
+  let sheet = document.getElementById('plan-route-sheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'plan-route-sheet';
+    sheet.style.cssText = `position:fixed;bottom:0;left:0;right:0;background:var(--surface);
+      border-radius:18px 18px 0 0;padding:20px 16px 36px;z-index:9999;
+      box-shadow:0 -4px 24px rgba(0,0,0,0.2);
+      transform:translateY(100%);transition:transform .25s ease`;
+    document.body.appendChild(sheet);
+  }
+
+  let prevInfo = '';
+  if (idx > 0) {
+    const pi = plan.items[idx-1];
+    const pg = data.gus.find(g => String(g.id) === String(pi.guId));
+    const pp = pg?.props.find(p => String(p.id) === String(pi.propId));
+    if (pg && pp) prevInfo = `${pg.name} ${pp.addr}`;
+  }
+
+  const dLat = destCoord ? destCoord.lat : 'null';
+  const dLng = destCoord ? destCoord.lng : 'null';
+
+  sheet.innerHTML = `
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">🟡 길찾기</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">목적지 <b>${idx+1}번</b>: ${dest}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="routeFromCurrent('${encodeURIComponent(dest)}',${dLat},${dLng})"
+        style="padding:14px 16px;background:#FEE500;color:#3A1D1D;border:none;border-radius:10px;
+          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">📍</span>
+        <div><div>현재 위치에서 출발</div><div style="font-size:11px;font-weight:400;opacity:.7">내 위치 → ${dest}</div></div>
+      </button>
+      ${prevInfo ? `
+      <button onclick="routeFromPrev(${idx-1},${idx},'${date}')"
+        style="padding:14px 16px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:10px;
+          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🔢</span>
+        <div><div>${idx}번에서 출발</div><div style="font-size:11px;font-weight:400;opacity:.7">${prevInfo} → ${dest}</div></div>
+      </button>` : ''}
+    </div>
+    <button onclick="closePlanRouteSheet()"
+      style="width:100%;margin-top:12px;padding:12px;background:var(--surface2);color:var(--text2);
+        border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:var(--sans);cursor:pointer">취소</button>`;
+
+  let overlay = document.getElementById('plan-route-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'plan-route-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;display:none';
+    overlay.onclick = closePlanRouteSheet;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  requestAnimationFrame(() => sheet.style.transform = 'translateY(0)');
+}
+
+function closePlanRouteSheet() {
+  const s = document.getElementById('plan-route-sheet');
+  const o = document.getElementById('plan-route-overlay');
+  if (s) s.style.transform = 'translateY(100%)';
+  if (o) o.style.display = 'none';
+}
+
+function routeFromCurrent(destEnc, dLat, dLng) {
+  closePlanRouteSheet();
+  const dest = decodeURIComponent(destEnc);
+  const url = (dLat && dLng)
+    ? `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&eX=${dLng}&eY=${dLat}&service=`
+    : `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&service=`;
+  window.open(url, '_blank');
+}
+
+function routeFromPrev(fromIdx, toIdx, date) {
+  closePlanRouteSheet();
+  if (planCoords[fromIdx] && planCoords[toIdx]) {
+    openKakaoRoute(fromIdx, toIdx);
+  } else {
+    alert('지도를 먼저 열어 좌표를 변환한 후 이용하세요.');
+  }
+}
+
 
 function getPlanForDate(date) {
   if (!data.plans) data.plans = [];
