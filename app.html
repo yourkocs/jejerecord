@@ -3741,7 +3741,7 @@ function renderPlanKakaoMap() {
         const lat = parseFloat(result[0].y);
         const lng = parseFloat(result[0].x);
         const coords = new kakao.maps.LatLng(lat, lng);
-        planCoords[idx] = { lat, lng, addr: item.prop.addr, name: `${num}. ${item.prop.addr}` };
+        planCoords[idx] = { lat, lng, addr: item.prop.addr, name: `${item.gu.name} ${item.prop.addr}` };
         bounds.extend(coords);
 
         // 번호 커스텀 오버레이
@@ -3840,11 +3840,12 @@ window.openKakaoRouteAll = function() {
   if (pts.length < 2) return;
   const from = pts[0];
   const to   = pts[pts.length - 1];
-  // 경유지 (최대 5개)
+  // 경유지 최대 5개 (카카오맵 웹 URL: viaX, viaY 파라미터)
   const vias = pts.slice(1, -1).slice(0, 5);
   let url = `https://map.kakao.com/?sName=${encodeURIComponent(from.name)}&sX=${from.lng}&sY=${from.lat}`;
   vias.forEach((v, i) => {
-    url += `&vName${i?i:''}=${encodeURIComponent(v.name)}&vX${i?i:''}=${v.lng}&vY${i?i:''}=${v.lat}`;
+    const suffix = i === 0 ? '' : String(i + 1);
+    url += `&vName${suffix}=${encodeURIComponent(v.name)}&vX${suffix}=${v.lng}&vY${suffix}=${v.lat}`;
   });
   url += `&eName=${encodeURIComponent(to.name)}&eX=${to.lng}&eY=${to.lat}&service=`;
   window.open(url, '_blank');
