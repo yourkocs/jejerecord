@@ -3813,17 +3813,26 @@ function openPlanRouteSheet(idx, date, dest, prevInfo) {
 
   sheet.innerHTML = `
     <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
-    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">🟡 길찾기</div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">길찾기</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:16px">
       목적지 <b>${idx+1}번</b>: ${dest.shortAddr}
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button onclick="routeFromCurrent('${encodeURIComponent(dest.fullAddr)}',${dest.lat},${dest.lng})"
+      <button onclick="routeKakaoApp('${encodeURIComponent(dest.fullAddr)}',${dest.lat},${dest.lng})"
         style="padding:14px 16px;background:#FEE500;color:#3A1D1D;border:none;border-radius:10px;
+          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🗺</span>
+        <div>
+          <div>카카오맵 앱으로 바로 열기</div>
+          <div style="font-size:11px;font-weight:400;opacity:.7">목적지만 설정 · 앱에서 출발지 선택</div>
+        </div>
+      </button>
+      <button onclick="routeFromCurrent('${encodeURIComponent(dest.fullAddr)}',${dest.lat},${dest.lng})"
+        style="padding:14px 16px;background:var(--surface);color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;
           font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
         <span style="font-size:20px">📍</span>
         <div>
-          <div>현재 위치에서 출발</div>
+          <div>현재 위치에서 출발 (웹)</div>
           <div style="font-size:11px;font-weight:400;opacity:.7">내 위치 → ${dest.shortAddr}</div>
         </div>
       </button>
@@ -3833,7 +3842,7 @@ function openPlanRouteSheet(idx, date, dest, prevInfo) {
           font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
         <span style="font-size:20px">🔢</span>
         <div>
-          <div>${idx}번에서 출발</div>
+          <div>${idx}번에서 출발 (웹)</div>
           <div style="font-size:11px;font-weight:400;opacity:.7">${prevInfo.shortAddr} → ${dest.shortAddr}</div>
         </div>
       </button>` : ''}
@@ -3843,6 +3852,29 @@ function openPlanRouteSheet(idx, date, dest, prevInfo) {
         border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:var(--sans);cursor:pointer">
       취소
     </button>`;
+
+  let overlay = document.getElementById('plan-route-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'plan-route-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;display:none';
+    overlay.onclick = closePlanRouteSheet;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  requestAnimationFrame(() => sheet.style.transform = 'translateY(0)');
+}
+
+// 카카오맵 앱 URL Scheme → 앱 없으면 웹 폴백
+function routeKakaoApp(destEnc, dLat, dLng) {
+  closePlanRouteSheet();
+  const dest   = decodeURIComponent(destEnc);
+  const appUrl = `kakaomap://route?ep=${dLat},${dLng}&by=CAR`;
+  const webUrl = `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&eX=${dLng}&eY=${dLat}&service=`;
+  const t = Date.now();
+  window.location.href = appUrl;
+  setTimeout(() => { if (Date.now() - t < 1500) window.open(webUrl, '_blank'); }, 500);
+}
 
   let overlay = document.getElementById('plan-route-overlay');
   if (!overlay) {
