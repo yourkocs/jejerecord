@@ -3876,18 +3876,6 @@ function routeKakaoApp(destEnc, dLat, dLng) {
   setTimeout(() => { if (Date.now() - t < 1500) window.open(webUrl, '_blank'); }, 500);
 }
 
-  let overlay = document.getElementById('plan-route-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'plan-route-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;display:none';
-    overlay.onclick = closePlanRouteSheet;
-    document.body.appendChild(overlay);
-  }
-  overlay.style.display = 'block';
-  requestAnimationFrame(() => sheet.style.transform = 'translateY(0)');
-}
-
 function closePlanRouteSheet() {
   const s = document.getElementById('plan-route-sheet');
   const o = document.getElementById('plan-route-overlay');
