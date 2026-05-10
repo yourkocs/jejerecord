@@ -3426,18 +3426,22 @@ function renderPlan() {
         ? `<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid var(--accent)">🏠 일반</span>`
         : `<span style="font-size:10px;background:var(--surface2);color:var(--text3);padding:1px 6px;border-radius:10px;border:1px solid var(--border)">미방문</span>`;
     return `
-    <div data-idx="${idx}" data-date="${date}" draggable="true"
-      ondragstart="onPlanDragStart(event)" ondragover="onPlanDragOver(event)"
-      ondrop="onPlanDrop(event)" ondragend="onPlanDragEnd(event)"
+    <div data-idx="${idx}" data-date="${date}"
+      ondragover="onPlanDragOver(event)" ondrop="onPlanDrop(event)" ondragend="onPlanDragEnd(event)"
       style="background:var(--surface);border:1px solid ${item.done?'var(--accent)':'var(--border)'};
         border-radius:12px;padding:12px 14px;margin-bottom:10px;
         display:flex;align-items:center;gap:10px;
-        ${item.done?'opacity:0.75':''}
-        user-select:none;-webkit-user-select:none;transition:box-shadow .15s">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:grab;padding:2px 4px" title="드래그해서 순서 변경">
-        <span style="font-size:16px;color:var(--text3);line-height:1;letter-spacing:-1px">⠿</span>
+        ${item.done?'opacity:0.75':''}transition:box-shadow .15s">
+      <!-- 핸들(드래그 전용) + 순번 + 체크 -->
+      <div data-handle="true"
+        draggable="true"
+        ondragstart="onPlanDragStart(event,${idx})"
+        style="display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;
+          cursor:grab;padding:6px 8px;margin:-6px -4px;touch-action:none"
+        title="드래그해서 순서 변경">
+        <span style="font-size:18px;color:var(--text3);line-height:1">⋮⋮</span>
         <span style="font-size:11px;font-weight:800;color:var(--text3);font-family:var(--mono)">${idx+1}</span>
-        <button onclick="togglePlanDone('${date}',${idx})"
+        <button onclick="event.stopPropagation();togglePlanDone('${date}',${idx})"
           style="width:22px;height:22px;border-radius:50%;border:2px solid ${item.done?'var(--accent)':'var(--border)'};
             background:${item.done?'var(--accent)':'transparent'};cursor:pointer;
             display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff">
@@ -3454,13 +3458,8 @@ function renderPlan() {
         ${lastVisit ? `<div style="font-size:11px;color:var(--text3)">방문: ${lastVisit.date} · ${judgeLabel(lastVisit.judge)}</div>` : '<div style="font-size:11px;color:var(--text3)">방문 기록 없음</div>'}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
-        <button onclick="openPlanRoute(${idx},'${date}')"
-          style="padding:6px 10px;background:#FEE500;color:#3A1D1D;border:none;border-radius:8px;
-            font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;white-space:nowrap">
-          🟡 길찾기
-        </button>
         <button onclick="goToPropFromPlan('${item.guId}','${item.propId}')"
-          style="padding:5px 10px;background:var(--accent);color:#fff;border:none;border-radius:8px;
+          style="padding:6px 10px;background:var(--accent);color:#fff;border:none;border-radius:8px;
             font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;white-space:nowrap">
           ${hasVisit?'상세보기':'기록 입력'} ▶
         </button>
@@ -3474,169 +3473,139 @@ function renderPlan() {
   initPlanTouchDrag();
 }
 
-// ── 드래그 앤 드롭 ──────────────────────────────────────────────────
+// ── 드래그 앤 드롭 (핸들 기반) ──────────────────────────────────────
 let dragSrcIdx = null;
+let dropIndicator = null;
 
-function onPlanDragStart(e) {
-  dragSrcIdx = parseInt(e.currentTarget.dataset.idx);
-  e.currentTarget.style.opacity = '0.4';
-  e.dataTransfer.effectAllowed = 'move';
+function getDropIndicator() {
+  if (!dropIndicator) {
+    dropIndicator = document.createElement('div');
+    dropIndicator.id = 'plan-drop-indicator';
+    dropIndicator.style.cssText = 'height:3px;background:var(--accent);border-radius:2px;margin:0 0 10px;display:none;transition:none';
+  }
+  return dropIndicator;
 }
+
+function onPlanDragStart(e, idx) {
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(idx));
+  // 드래그 중인 카드 반투명
+  const card = document.querySelector(`#plan-list > div[data-idx="${idx}"]`);
+  if (card) setTimeout(() => card.style.opacity = '0.35', 0);
+}
+
 function onPlanDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  document.querySelectorAll('#plan-list > div').forEach(el => el.style.boxShadow = '');
-  e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent)';
+  const card = e.currentTarget;
+  const list = document.getElementById('plan-list');
+  const ind  = getDropIndicator();
+  // 카드 중간 기준으로 위/아래 결정
+  const rect = card.getBoundingClientRect();
+  const mid  = rect.top + rect.height / 2;
+  if (e.clientY < mid) {
+    list.insertBefore(ind, card);
+  } else {
+    list.insertBefore(ind, card.nextSibling);
+  }
+  ind.style.display = 'block';
 }
+
 function onPlanDragEnd(e) {
-  document.querySelectorAll('#plan-list > div').forEach(el => { el.style.boxShadow = ''; el.style.opacity = ''; });
+  document.querySelectorAll('#plan-list > div[data-idx]').forEach(el => el.style.opacity = '');
+  if (dropIndicator) dropIndicator.style.display = 'none';
+  dragSrcIdx = null;
 }
+
 function onPlanDrop(e) {
   e.preventDefault();
-  const toIdx = parseInt(e.currentTarget.dataset.idx);
-  const date  = e.currentTarget.dataset.date;
-  if (dragSrcIdx === null || dragSrcIdx === toIdx) return;
+  const toCard = e.currentTarget;
+  const toIdx  = parseInt(toCard.dataset.idx);
+  const date   = toCard.dataset.date;
+  if (dragSrcIdx === null || dragSrcIdx === toIdx) {
+    onPlanDragEnd(e); return;
+  }
+  // 위/아래 결정
+  const rect = toCard.getBoundingClientRect();
+  const mid  = rect.top + rect.height / 2;
+  let insertIdx = e.clientY < mid ? toIdx : toIdx + 1;
+  if (insertIdx > dragSrcIdx) insertIdx--;
+
   const plan = getPlanForDate(date);
   if (!plan) return;
   const [moved] = plan.items.splice(dragSrcIdx, 1);
-  plan.items.splice(toIdx, 0, moved);
+  plan.items.splice(insertIdx, 0, moved);
   dragSrcIdx = null;
+  if (dropIndicator) dropIndicator.style.display = 'none';
   saveData(); renderPlan();
 }
 
-// ── 터치 드래그 (모바일) ────────────────────────────────────────────
+// ── 터치 드래그 (핸들 기반, 모바일) ────────────────────────────────
 function initPlanTouchDrag() {
-  const cards = document.querySelectorAll('#plan-list > div[draggable]');
-  let tSrcIdx = null, lastOver = null;
-  cards.forEach(card => {
-    card.addEventListener('touchstart', e => {
-      tSrcIdx = parseInt(card.dataset.idx);
+  const handles = document.querySelectorAll('#plan-list [data-handle]');
+  let tSrcIdx = null, tSrcCard = null, ghostEl = null, lastOverCard = null;
+
+  handles.forEach(handle => {
+    handle.addEventListener('touchstart', e => {
+      const card = handle.closest('div[data-idx]');
+      tSrcIdx  = parseInt(card.dataset.idx);
+      tSrcCard = card;
       card.style.opacity = '0.4';
+      // 고스트 생성
+      ghostEl = card.cloneNode(true);
+      ghostEl.style.cssText += ';position:fixed;z-index:9999;pointer-events:none;opacity:0.8;width:'+card.offsetWidth+'px;box-shadow:0 8px 24px rgba(0,0,0,0.2)';
+      document.body.appendChild(ghostEl);
     }, { passive: true });
-    card.addEventListener('touchmove', e => {
+
+    handle.addEventListener('touchmove', e => {
       e.preventDefault();
       const t = e.touches[0];
-      const els = document.elementsFromPoint(t.clientX, t.clientY);
-      const over = els.find(el => el.dataset?.idx && el !== card);
-      if (over && over !== lastOver) {
-        document.querySelectorAll('#plan-list > div').forEach(el => el.style.boxShadow = '');
-        over.style.boxShadow = '0 0 0 2px var(--accent)';
-        lastOver = over;
+      if (ghostEl) {
+        ghostEl.style.left = (t.clientX - ghostEl.offsetWidth/2) + 'px';
+        ghostEl.style.top  = (t.clientY - 30) + 'px';
       }
-    }, { passive: false });
-    card.addEventListener('touchend', () => {
-      card.style.opacity = '';
-      document.querySelectorAll('#plan-list > div').forEach(el => el.style.boxShadow = '');
-      if (lastOver?.dataset?.idx !== undefined && tSrcIdx !== null) {
-        const toIdx = parseInt(lastOver.dataset.idx);
-        const date  = card.dataset.date;
-        if (tSrcIdx !== toIdx) {
-          const plan = getPlanForDate(date);
-          if (plan) {
-            const [moved] = plan.items.splice(tSrcIdx, 1);
-            plan.items.splice(toIdx, 0, moved);
-            saveData(); renderPlan();
-          }
+      const ind = getDropIndicator();
+      const cards = [...document.querySelectorAll('#plan-list > div[data-idx]')].filter(c => c !== tSrcCard);
+      let placed = false;
+      for (const c of cards) {
+        const r = c.getBoundingClientRect();
+        if (t.clientY >= r.top && t.clientY < r.top + r.height / 2) {
+          document.getElementById('plan-list').insertBefore(ind, c);
+          ind.style.display = 'block'; lastOverCard = c; placed = true; break;
+        } else if (t.clientY >= r.top + r.height / 2 && t.clientY < r.bottom) {
+          document.getElementById('plan-list').insertBefore(ind, c.nextSibling);
+          ind.style.display = 'block'; lastOverCard = c; placed = true; break;
         }
       }
-      tSrcIdx = null; lastOver = null;
+      if (!placed) ind.style.display = 'none';
+    }, { passive: false });
+
+    handle.addEventListener('touchend', e => {
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      if (tSrcCard) tSrcCard.style.opacity = '';
+      const ind = getDropIndicator(); ind.style.display = 'none';
+
+      if (lastOverCard && tSrcIdx !== null) {
+        const toIdx = parseInt(lastOverCard.dataset.idx);
+        const date  = tSrcCard.dataset.date;
+        const plan  = getPlanForDate(date);
+        if (plan && tSrcIdx !== toIdx) {
+          const t = e.changedTouches[0];
+          const r = lastOverCard.getBoundingClientRect();
+          let insertIdx = t.clientY < r.top + r.height / 2 ? toIdx : toIdx + 1;
+          if (insertIdx > tSrcIdx) insertIdx--;
+          const [moved] = plan.items.splice(tSrcIdx, 1);
+          plan.items.splice(insertIdx, 0, moved);
+          saveData(); renderPlan();
+        }
+      }
+      tSrcIdx = null; tSrcCard = null; lastOverCard = null;
     }, { passive: true });
   });
 }
 
 // ── 길찾기 바텀시트 ─────────────────────────────────────────────────
-function openPlanRoute(idx, date) {
-  const plan = getPlanForDate(date);
-  if (!plan) return;
-  const item = plan.items[idx];
-  const gu   = data.gus.find(g => String(g.id) === String(item.guId));
-  const prop = gu?.props.find(p => String(p.id) === String(item.propId));
-  if (!gu || !prop) return;
-  const dest      = `${gu.name} ${prop.addr}`;
-  const destCoord = planCoords[idx];
-
-  let sheet = document.getElementById('plan-route-sheet');
-  if (!sheet) {
-    sheet = document.createElement('div');
-    sheet.id = 'plan-route-sheet';
-    sheet.style.cssText = `position:fixed;bottom:0;left:0;right:0;background:var(--surface);
-      border-radius:18px 18px 0 0;padding:20px 16px 36px;z-index:9999;
-      box-shadow:0 -4px 24px rgba(0,0,0,0.2);
-      transform:translateY(100%);transition:transform .25s ease`;
-    document.body.appendChild(sheet);
-  }
-
-  let prevInfo = '';
-  if (idx > 0) {
-    const pi = plan.items[idx-1];
-    const pg = data.gus.find(g => String(g.id) === String(pi.guId));
-    const pp = pg?.props.find(p => String(p.id) === String(pi.propId));
-    if (pg && pp) prevInfo = `${pg.name} ${pp.addr}`;
-  }
-
-  const dLat = destCoord ? destCoord.lat : 'null';
-  const dLng = destCoord ? destCoord.lng : 'null';
-
-  sheet.innerHTML = `
-    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
-    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">🟡 길찾기</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">목적지 <b>${idx+1}번</b>: ${dest}</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button onclick="routeFromCurrent('${encodeURIComponent(dest)}',${dLat},${dLng})"
-        style="padding:14px 16px;background:#FEE500;color:#3A1D1D;border:none;border-radius:10px;
-          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">📍</span>
-        <div><div>현재 위치에서 출발</div><div style="font-size:11px;font-weight:400;opacity:.7">내 위치 → ${dest}</div></div>
-      </button>
-      ${prevInfo ? `
-      <button onclick="routeFromPrev(${idx-1},${idx},'${date}')"
-        style="padding:14px 16px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:10px;
-          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">🔢</span>
-        <div><div>${idx}번에서 출발</div><div style="font-size:11px;font-weight:400;opacity:.7">${prevInfo} → ${dest}</div></div>
-      </button>` : ''}
-    </div>
-    <button onclick="closePlanRouteSheet()"
-      style="width:100%;margin-top:12px;padding:12px;background:var(--surface2);color:var(--text2);
-        border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:var(--sans);cursor:pointer">취소</button>`;
-
-  let overlay = document.getElementById('plan-route-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'plan-route-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;display:none';
-    overlay.onclick = closePlanRouteSheet;
-    document.body.appendChild(overlay);
-  }
-  overlay.style.display = 'block';
-  requestAnimationFrame(() => sheet.style.transform = 'translateY(0)');
-}
-
-function closePlanRouteSheet() {
-  const s = document.getElementById('plan-route-sheet');
-  const o = document.getElementById('plan-route-overlay');
-  if (s) s.style.transform = 'translateY(100%)';
-  if (o) o.style.display = 'none';
-}
-
-function routeFromCurrent(destEnc, dLat, dLng) {
-  closePlanRouteSheet();
-  const dest = decodeURIComponent(destEnc);
-  const url = (dLat && dLng)
-    ? `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&eX=${dLng}&eY=${dLat}&service=`
-    : `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&service=`;
-  window.open(url, '_blank');
-}
-
-function routeFromPrev(fromIdx, toIdx, date) {
-  closePlanRouteSheet();
-  if (planCoords[fromIdx] && planCoords[toIdx]) {
-    openKakaoRoute(fromIdx, toIdx);
-  } else {
-    alert('지도를 먼저 열어 좌표를 변환한 후 이용하세요.');
-  }
-}
-
 
 function getPlanForDate(date) {
   if (!data.plans) data.plans = [];
@@ -3687,13 +3656,12 @@ function togglePlanMap() {
   if (planMapOpen) renderPlanKakaoMap();
 }
 
-let planCoords = []; // geocoder 결과 좌표 저장
+let planCoords = [];
 
 function renderPlanKakaoMap() {
   if (typeof kakao === 'undefined' || typeof kakao.maps === 'undefined') {
     setTimeout(renderPlanKakaoMap, 500); return;
   }
-
   const date = document.getElementById('plan-date').value;
   const plan = getPlanForDate(date);
   if (!plan || !plan.items.length) return;
@@ -3719,7 +3687,6 @@ function renderPlanKakaoMap() {
 
   if (!items.length) return;
 
-  // 슬롯 미리 확보 (인덱스 보장)
   items.forEach(() => { planCoords.push(null); planMapOverlays.push(null); planMapInfowindows.push(null); });
 
   const geocoder = new kakao.maps.services.Geocoder();
@@ -3728,89 +3695,73 @@ function renderPlanKakaoMap() {
   statusEl.innerHTML = `주소 변환 중... (0 / ${items.length})`;
 
   items.forEach((item, idx) => {
-    const fullAddr  = item.gu.name + ' ' + item.prop.addr;
-    const isAuction = item.lv?.mode === '경매';
-    const isDone    = item.done;
-    const num       = idx + 1;
-    const bg        = isDone ? '#aab0c8' : isAuction ? '#e67e00' : '#1a3a8f';
+    const searchAddr = item.gu.name + ' ' + item.prop.addr;
+    const isAuction  = item.lv?.mode === '경매';
+    const isDone     = item.done;
+    const num        = idx + 1;
+    const bg         = isDone ? '#aab0c8' : isAuction ? '#e67e00' : '#1a3a8f';
 
-    geocoder.addressSearch(fullAddr, function(result, status) {
+    geocoder.addressSearch(searchAddr, function(result, status) {
       resolved++;
-
       if (status === kakao.maps.services.Status.OK) {
         const lat = parseFloat(result[0].y);
         const lng = parseFloat(result[0].x);
+        // Full 주소: geocoder 결과에서 도로명 또는 지번 주소 사용
+        const fullAddr = result[0].road_address?.address_name
+                      || result[0].address?.address_name
+                      || searchAddr;
         const coords = new kakao.maps.LatLng(lat, lng);
-        planCoords[idx] = { lat, lng, addr: item.prop.addr, name: `${item.gu.name} ${item.prop.addr}` };
+        planCoords[idx] = { lat, lng, fullAddr, shortAddr: item.prop.addr, num };
         bounds.extend(coords);
 
-        // 번호 커스텀 오버레이
+        // 번호 마커 오버레이
         const overlayContent = `
           <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:translateX(-50%)"
                onclick="openPlanMarkerInfo(${idx})">
-            <div style="width:32px;height:32px;border-radius:50%;background:${bg};color:#fff;
-              font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;
-              border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);
+            <div style="width:34px;height:34px;border-radius:50%;background:${bg};color:#fff;
+              font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;
+              border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);
               font-family:'Noto Sans KR',sans-serif">${num}</div>
             <div style="width:0;height:0;border-left:5px solid transparent;
-              border-right:5px solid transparent;border-top:7px solid ${bg};margin-top:-1px"></div>
+              border-right:5px solid transparent;border-top:8px solid ${bg};margin-top:-1px"></div>
           </div>`;
 
         const overlay = new kakao.maps.CustomOverlay({ position: coords, content: overlayContent, yAnchor: 1.15, zIndex: 3 });
         overlay.setMap(planMapInstance);
         planMapOverlays[idx] = overlay;
 
-        // 말풍선 — 길찾기 버튼 포함
+        // 말풍선
         const auc = item.lv?.auction;
-        const prevIdx = idx - 1;
-        const nextIdx = idx + 1;
-        const routeBtns = `
-          <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
-            ${prevIdx >= 0 ? `<button onclick="openKakaoRoute(${prevIdx},${idx})"
-              style="padding:4px 9px;background:#FEE500;color:#3A1D1D;border:none;border-radius:6px;
-              font-size:11px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
-              ← ${prevIdx+1}→${num} 길찾기</button>` : ''}
-            ${nextIdx < items.length ? `<button onclick="openKakaoRoute(${idx},${nextIdx})"
-              style="padding:4px 9px;background:#FEE500;color:#3A1D1D;border:none;border-radius:6px;
-              font-size:11px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
-              ${num}→${nextIdx+1} 길찾기 →</button>` : ''}
-          </div>`;
-
         const iwContent = `
-          <div style="padding:9px 12px;min-width:170px;max-width:230px;
-            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.7">
-            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-              <span style="font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;
+          <div style="padding:10px 13px;min-width:170px;max-width:230px;
+            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.75">
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+              <span style="font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;
                 background:${isAuction?'#fff8e0':'#e8edf8'};
                 color:${isAuction?'#7c5a00':'#1a3a8f'};
                 border:1px solid ${isAuction?'#f0c878':'#1a3a8f'}">
                 ${isAuction?'⚖ 경매':'🏠 일반'}</span>
-              <b style="font-size:11px;color:#333">${num}번</b>
+              <b style="color:#555;font-size:11px">${num}번</b>
+              ${isDone?'<span style="color:#1a3a8f;font-size:10px">✅ 완료</span>':''}
             </div>
-            <div style="font-weight:700;color:#0f1733;font-size:13px">${item.prop.addr}</div>
-            <div style="color:#8890aa;font-size:11px">${item.gu.name} · ${item.prop.dtype}</div>
-            ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-top:2px">🔔 ${auc.bidDate}${auc.case?' · '+auc.case:''}</div>` : ''}
-            ${isDone ? '<div style="color:#1a3a8f;font-size:11px;margin-top:2px">✅ 완료</div>' : ''}
-            ${routeBtns}
+            <div style="font-weight:700;color:#0f1733;font-size:13px;margin-bottom:1px">${item.prop.addr}</div>
+            <div style="color:#8890aa;font-size:11px;margin-bottom:6px">${item.gu.name} · ${item.prop.dtype}</div>
+            ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-bottom:6px">🔔 ${auc.bidDate}${auc.case?' · '+auc.case:''}</div>` : ''}
+            <button onclick="openMarkerRoute(${idx},'${date}')"
+              style="width:100%;padding:7px;background:#FEE500;color:#3A1D1D;border:none;border-radius:7px;
+                font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
+              🟡 여기로 길찾기
+            </button>
           </div>`;
 
-        const infowindow = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-        planMapInfowindows[idx] = infowindow;
+        const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
+        planMapInfowindows[idx] = iw;
       }
 
       statusEl.innerHTML = `주소 변환 중... (${resolved} / ${items.length})`;
-
       if (resolved === items.length) {
         const ok = planCoords.filter(Boolean).length;
-        // 하단 상태바 — 전체 동선 길찾기 버튼 포함
-        statusEl.innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-            <span>📍 ${ok}개 물건 표시 · 마커 클릭 시 길찾기</span>
-            ${ok >= 2 ? `<button onclick="openKakaoRouteAll()"
-              style="padding:5px 12px;background:#FEE500;color:#3A1D1D;border:none;border-radius:7px;
-              font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
-              🟡 전체 동선 카카오맵 열기</button>` : ''}
-          </div>`;
+        statusEl.innerHTML = `📍 ${ok}개 물건 표시 · 마커 클릭 → 길찾기`;
         if (ok > 0) planMapInstance.setBounds(bounds, 60);
       }
     });
@@ -3825,31 +3776,116 @@ window.openPlanMarkerInfo = function(i) {
   });
 };
 
-// 두 지점 간 카카오맵 길찾기
-window.openKakaoRoute = function(fromIdx, toIdx) {
-  const from = planCoords[fromIdx];
-  const to   = planCoords[toIdx];
-  if (!from || !to) return;
-  const url = `https://map.kakao.com/?sName=${encodeURIComponent(from.name)}&sX=${from.lng}&sY=${from.lat}&eName=${encodeURIComponent(to.name)}&eX=${to.lng}&eY=${to.lat}&service=`;
-  window.open(url, '_blank');
+// 마커 말풍선에서 길찾기 버튼 클릭
+window.openMarkerRoute = function(idx, date) {
+  const plan = getPlanForDate(date);
+  if (!plan) return;
+  const dest = planCoords[idx];
+  if (!dest) { alert('지도를 열어 좌표 변환 후 사용하세요.'); return; }
+
+  // 이전 물건 정보
+  let prevInfo = null;
+  if (idx > 0 && planCoords[idx-1]) {
+    prevInfo = planCoords[idx-1];
+  }
+
+  // 기존 바텀시트 닫기
+  const existSheet = document.getElementById('plan-route-sheet');
+  if (existSheet) existSheet.style.transform = 'translateY(100%)';
+
+  // 말풍선 닫기
+  planMapInfowindows.forEach(iw => { try { iw?.close(); } catch(e){} });
+
+  setTimeout(() => openPlanRouteSheet(idx, date, dest, prevInfo), 150);
 };
 
-// 전체 동선 — 1→2→3... 순서로 카카오맵 열기 (경유지 URL)
-window.openKakaoRouteAll = function() {
-  const pts = planCoords.filter(Boolean);
-  if (pts.length < 2) return;
-  const from = pts[0];
-  const to   = pts[pts.length - 1];
-  // 경유지 최대 5개 (카카오맵 웹 URL: viaX, viaY 파라미터)
-  const vias = pts.slice(1, -1).slice(0, 5);
-  let url = `https://map.kakao.com/?sName=${encodeURIComponent(from.name)}&sX=${from.lng}&sY=${from.lat}`;
-  vias.forEach((v, i) => {
-    const suffix = i === 0 ? '' : String(i + 1);
-    url += `&vName${suffix}=${encodeURIComponent(v.name)}&vX${suffix}=${v.lng}&vY${suffix}=${v.lat}`;
-  });
-  url += `&eName=${encodeURIComponent(to.name)}&eX=${to.lng}&eY=${to.lat}&service=`;
+function openPlanRouteSheet(idx, date, dest, prevInfo) {
+  let sheet = document.getElementById('plan-route-sheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'plan-route-sheet';
+    sheet.style.cssText = `position:fixed;bottom:0;left:0;right:0;background:var(--surface);
+      border-radius:18px 18px 0 0;padding:20px 16px 36px;z-index:9999;
+      box-shadow:0 -4px 24px rgba(0,0,0,0.2);
+      transform:translateY(100%);transition:transform .25s ease`;
+    document.body.appendChild(sheet);
+  }
+
+  sheet.innerHTML = `
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">🟡 길찾기</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">
+      목적지 <b>${idx+1}번</b>: ${dest.shortAddr}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="routeFromCurrent('${encodeURIComponent(dest.fullAddr)}',${dest.lat},${dest.lng})"
+        style="padding:14px 16px;background:#FEE500;color:#3A1D1D;border:none;border-radius:10px;
+          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">📍</span>
+        <div>
+          <div>현재 위치에서 출발</div>
+          <div style="font-size:11px;font-weight:400;opacity:.7">내 위치 → ${dest.shortAddr}</div>
+        </div>
+      </button>
+      ${prevInfo ? `
+      <button onclick="routeFromCoord('${encodeURIComponent(prevInfo.fullAddr)}',${prevInfo.lat},${prevInfo.lng},'${encodeURIComponent(dest.fullAddr)}',${dest.lat},${dest.lng})"
+        style="padding:14px 16px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);border-radius:10px;
+          font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🔢</span>
+        <div>
+          <div>${idx}번에서 출발</div>
+          <div style="font-size:11px;font-weight:400;opacity:.7">${prevInfo.shortAddr} → ${dest.shortAddr}</div>
+        </div>
+      </button>` : ''}
+    </div>
+    <button onclick="closePlanRouteSheet()"
+      style="width:100%;margin-top:12px;padding:12px;background:var(--surface2);color:var(--text2);
+        border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:var(--sans);cursor:pointer">
+      취소
+    </button>`;
+
+  let overlay = document.getElementById('plan-route-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'plan-route-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;display:none';
+    overlay.onclick = closePlanRouteSheet;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  requestAnimationFrame(() => sheet.style.transform = 'translateY(0)');
+}
+
+function closePlanRouteSheet() {
+  const s = document.getElementById('plan-route-sheet');
+  const o = document.getElementById('plan-route-overlay');
+  if (s) s.style.transform = 'translateY(100%)';
+  if (o) o.style.display = 'none';
+}
+
+// 현재위치 → 목적지
+function routeFromCurrent(destEnc, dLat, dLng) {
+  closePlanRouteSheet();
+  const dest = decodeURIComponent(destEnc);
+  const url = `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&eX=${dLng}&eY=${dLat}&service=`;
   window.open(url, '_blank');
-};
+}
+
+// 이전 물건 → 이 물건 (좌표 기반)
+function routeFromCoord(fromEnc, fLat, fLng, toEnc, tLat, tLng) {
+  closePlanRouteSheet();
+  const from = decodeURIComponent(fromEnc);
+  const to   = decodeURIComponent(toEnc);
+  const url  = `https://map.kakao.com/?sName=${encodeURIComponent(from)}&sX=${fLng}&sY=${fLat}&eName=${encodeURIComponent(to)}&eX=${tLng}&eY=${tLat}&service=`;
+  window.open(url, '_blank');
+}
+
+// 레거시 호환
+function openPlanMapNaver() {}
+function openPlanMapKakao() {}
+function getPlanAddrs() { return []; }
+window.openKakaoRouteAll = function() {};
+window.openKakaoRoute = function() {};
 
 // ── 물건 추가 모달 ──────────────────────────────────────────────────
 let planTypeFilter = 'all';
