@@ -631,6 +631,25 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
         + 물건 추가
       </button>
     </div>
+
+    <!-- 지도 동선 패널 (물건 있을 때만 표시) -->
+    <div id="plan-map-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;flex-wrap:wrap;gap:8px">
+        <span style="font-size:13px;font-weight:700;color:var(--text)">🗺 동선 지도</span>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div id="plan-map-addr-list" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+          <button onclick="togglePlanMap()" id="plan-map-toggle-btn"
+            style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer">
+            📍 지도 열기
+          </button>
+        </div>
+      </div>
+      <div id="plan-map-wrap" style="display:none">
+        <div id="plan-kakao-map" style="width:100%;height:320px"></div>
+        <div id="plan-map-status" style="font-size:11px;color:var(--text3);padding:6px 14px;border-top:1px solid var(--border)">마커를 클릭하면 물건 정보를 볼 수 있습니다</div>
+      </div>
+    </div>
+
     <div id="plan-list"></div>
     <div id="plan-empty" style="display:none;text-align:center;padding:48px 0;color:var(--text3)">
       <div style="font-size:32px;margin-bottom:12px">📅</div>
@@ -1178,21 +1197,37 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); font
 
 <!-- 임장 플래너 물건 추가 모달 -->
 <div class="modal-overlay" id="modal-add-plan">
-  <div class="modal">
+  <div class="modal" style="max-width:480px">
     <h3>📅 임장 물건 추가</h3>
-    <div class="field"><label>구역 선택</label>
-      <select id="plan-gu-select" onchange="renderPlanPropSelect()" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans)">
+
+    <!-- 1단계: 구역 선택 -->
+    <div class="field"><label>① 구역 선택</label>
+      <select id="plan-gu-select" onchange="renderPlanPropList()" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans)">
         <option value="">구역을 선택하세요</option>
       </select>
     </div>
-    <div class="field"><label>물건 선택</label>
-      <select id="plan-prop-select" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans)">
-        <option value="">물건을 선택하세요</option>
-      </select>
+
+    <!-- 2단계: 매물 유형 필터 -->
+    <div id="plan-type-filter" style="display:none;margin-bottom:10px">
+      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">② 매물 유형 필터</label>
+      <div style="display:flex;gap:6px">
+        <button onclick="setPlanTypeFilter('all')" id="pf-all"
+          style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer">전체</button>
+        <button onclick="setPlanTypeFilter('일반')" id="pf-normal"
+          style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;font-family:var(--sans);cursor:pointer">🏠 일반</button>
+        <button onclick="setPlanTypeFilter('경매')" id="pf-auction"
+          style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;font-family:var(--sans);cursor:pointer">⚖️ 경매</button>
+      </div>
     </div>
-    <div class="btn-row" style="justify-content:flex-end">
+
+    <!-- 3단계: 물건 목록 (카드형) -->
+    <div id="plan-prop-list" style="max-height:300px;overflow-y:auto;display:none">
+      <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">③ 물건 선택 <span id="plan-prop-count" style="font-weight:400;color:var(--text3)"></span></label>
+      <div id="plan-prop-cards"></div>
+    </div>
+
+    <div class="btn-row" style="justify-content:flex-end;margin-top:14px">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-plan')">취소</button>
-      <button class="btn btn-primary" onclick="addPlanItem()">추가</button>
     </div>
   </div>
 </div>
@@ -2172,7 +2207,16 @@ function renderVisits() {
               </div>`;
             })() : ''}
             <div class="auction-grid">
-              <div class="auction-field"><div class="af-label">사건번호</div><div class="af-val">${auc.case}</div></div>
+              <div class="auction-field" style="grid-column:1/-1">
+                <div class="af-label">사건번호</div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px">
+                  <span class="af-val">${auc.case}</span>
+                  <button onclick="navigator.clipboard.writeText('${auc.case}').then(()=>{const b=event.target;const o=b.textContent;b.textContent='✅ 복사됨';setTimeout(()=>b.textContent=o,1500)})"
+                    style="padding:2px 8px;background:var(--warn-light);color:var(--warn);border:1px solid #f0c878;border-radius:6px;font-size:10px;font-family:var(--sans);cursor:pointer;white-space:nowrap">📋 번호 복사</button>
+                  <a href="https://www.hankauction.com" target="_blank"
+                    style="padding:2px 8px;background:var(--warn-light);color:var(--warn);border:1px solid #f0c878;border-radius:6px;font-size:10px;font-family:var(--sans);text-decoration:none;white-space:nowrap">🔨 행크옥션</a>
+                </div>
+              </div>
               <div class="auction-field"><div class="af-label">감정가</div><div class="af-val">${fmt(auc.appraise)}만</div></div>
               <div class="auction-field"><div class="af-label">최저입찰가</div><div class="af-val">${fmt(auc.minBid)}만</div></div>
               ${auc.myBid ? `<div class="auction-field"><div class="af-label">내 입찰가</div><div class="af-val" style="color:var(--info);font-weight:700">${fmt(auc.myBid)}만</div></div>` : ''}
@@ -3255,11 +3299,13 @@ function renderPlan() {
   const list = document.getElementById('plan-list');
   const empty = document.getElementById('plan-empty');
   const summary = document.getElementById('plan-summary');
+  const mapPanel = document.getElementById('plan-map-panel');
 
   if (!plan || !plan.items.length) {
     list.innerHTML = '';
     empty.style.display = 'block';
     summary.textContent = '';
+    mapPanel.style.display = 'none';
     return;
   }
 
@@ -3267,30 +3313,65 @@ function renderPlan() {
   const done = plan.items.filter(i => i.done).length;
   summary.textContent = `총 ${plan.items.length}곳 · 완료 ${done}곳`;
 
+  // 지도 패널 주소 뱃지 + 지도 갱신
+  mapPanel.style.display = 'block';
+  const addrListEl = document.getElementById('plan-map-addr-list');
+  addrListEl.innerHTML = plan.items.map((item, idx) => {
+    const gu = data.gus.find(g => String(g.id) === String(item.guId));
+    const prop = gu?.props.find(p => String(p.id) === String(item.propId));
+    if (!gu || !prop) return '';
+    const lastMode = prop.visits.length ? prop.visits[prop.visits.length-1].mode : '';
+    const isAuction = lastMode === '경매';
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;
+      background:${item.done ? 'var(--surface2)' : isAuction ? 'var(--warn-light)' : 'var(--accent-light)'};
+      color:${item.done ? 'var(--text3)' : isAuction ? 'var(--warn)' : 'var(--accent)'};
+      border:1px solid ${item.done ? 'var(--border)' : isAuction ? '#f0c878' : 'var(--accent)'};
+      text-decoration:${item.done ? 'line-through' : 'none'}">
+      <b>${idx+1}</b> ${prop.addr}
+    </span>`;
+  }).join('');
+
+  // 지도가 열려있으면 자동 갱신
+  if (planMapOpen) renderPlanKakaoMap();
+
   list.innerHTML = plan.items.map((item, idx) => {
     const gu = data.gus.find(g => String(g.id) === String(item.guId));
     const prop = gu?.props.find(p => String(p.id) === String(item.propId));
     if (!gu || !prop) return '';
     const lastVisit = prop.visits[prop.visits.length - 1];
     const hasVisit = prop.visits.length > 0;
+    const isAuction = lastVisit?.mode === '경매';
+    const auc = lastVisit?.auction;
+    const modeBadge = isAuction
+      ? `<span style="font-size:10px;background:var(--warn-light);color:var(--warn);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid #f0c878">⚖️ 경매</span>`
+      : hasVisit
+        ? `<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid var(--accent)">🏠 일반</span>`
+        : `<span style="font-size:10px;background:var(--surface2);color:var(--text3);padding:1px 6px;border-radius:10px;border:1px solid var(--border)">미방문</span>`;
     return `
     <div style="background:var(--surface);border:1px solid ${item.done ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;${item.done ? 'opacity:0.75' : ''}">
-      <button onclick="togglePlanDone('${date}',${idx})"
-        style="width:24px;height:24px;border-radius:50%;border:2px solid ${item.done ? 'var(--accent)' : 'var(--border)'};background:${item.done ? 'var(--accent)' : 'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff">
-        ${item.done ? '✓' : ''}
-      </button>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:700;${item.done ? 'text-decoration:line-through;color:var(--text3)' : ''}">${prop.addr}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">${gu.name} · ${prop.dtype}</div>
-        ${lastVisit ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">최근 방문: ${lastVisit.date} · ${judgeLabel(lastVisit.judge)}</div>` : '<div style="font-size:11px;color:var(--text3);margin-top:2px">방문 기록 없음</div>'}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+        <span style="font-size:11px;font-weight:800;color:var(--text3);font-family:var(--mono)">${idx+1}</span>
+        <button onclick="togglePlanDone('${date}',${idx})"
+          style="width:24px;height:24px;border-radius:50%;border:2px solid ${item.done ? 'var(--accent)' : 'var(--border)'};background:${item.done ? 'var(--accent)' : 'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff">
+          ${item.done ? '✓' : ''}
+        </button>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+          ${modeBadge}
+          <span style="font-size:15px;font-weight:700;${item.done ? 'text-decoration:line-through;color:var(--text3)' : ''}">${prop.addr}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:2px">${gu.name} · ${prop.dtype}</div>
+        ${isAuction && auc?.bidDate ? `<div style="font-size:11px;color:var(--warn);font-weight:600">🔔 낙찰기일: ${auc.bidDate}${auc.case ? ' · ' + auc.case : ''}</div>` : ''}
+        ${lastVisit ? `<div style="font-size:11px;color:var(--text3)">최근 방문: ${lastVisit.date} · ${judgeLabel(lastVisit.judge)}</div>` : '<div style="font-size:11px;color:var(--text3)">방문 기록 없음</div>'}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
         <button onclick="goToPropFromPlan('${item.guId}','${item.propId}')"
           style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer">
-          ${hasVisit ? '상세보기' : '방문기록 입력'} ▶
+          ${hasVisit ? '상세보기' : '기록 입력'} ▶
         </button>
         <button onclick="removePlanItem('${date}',${idx})"
-          style="padding:6px 10px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);cursor:pointer">✕</button>
+          style="padding:5px 10px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--sans);cursor:pointer">✕ 제거</button>
       </div>
     </div>`;
   }).join('');
@@ -3330,36 +3411,283 @@ function goToPropFromPlan(guId, propId) {
   goLevel(2, parseFloat(guId), parseFloat(propId));
 }
 
+// ── 임장 플래너 지도 (카카오맵 다중 핀) ──────────────────────────
+let planMapInstance = null;
+let planMapOpen = false;
+let planMapOverlays = [];
+let planMapInfowindows = [];
+
+function togglePlanMap() {
+  const wrap = document.getElementById('plan-map-wrap');
+  const btn  = document.getElementById('plan-map-toggle-btn');
+  planMapOpen = !planMapOpen;
+  wrap.style.display = planMapOpen ? 'block' : 'none';
+  btn.textContent = planMapOpen ? '📍 지도 닫기' : '📍 지도 열기';
+  if (planMapOpen) renderPlanKakaoMap();
+}
+
+function renderPlanKakaoMap() {
+  if (typeof kakao === 'undefined' || typeof kakao.maps === 'undefined') {
+    setTimeout(renderPlanKakaoMap, 500); return;
+  }
+
+  const date = document.getElementById('plan-date').value;
+  const plan = getPlanForDate(date);
+  if (!plan || !plan.items.length) return;
+
+  const container = document.getElementById('plan-kakao-map');
+  const statusEl  = document.getElementById('plan-map-status');
+
+  // 지도 초기화 (항상 새로 그림)
+  planMapInstance = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(37.5665, 126.9780), level: 8
+  });
+
+  // 기존 오버레이 제거
+  planMapOverlays.forEach(o => o.setMap(null));
+  planMapInfowindows.forEach(iw => iw.close());
+  planMapOverlays = []; planMapInfowindows = [];
+
+  const items = plan.items.map(item => {
+    const gu   = data.gus.find(g => String(g.id) === String(item.guId));
+    const prop = gu?.props.find(p => String(p.id) === String(item.propId));
+    if (!gu || !prop) return null;
+    const lv = prop.visits[prop.visits.length - 1];
+    return { gu, prop, lv, done: item.done };
+  }).filter(Boolean);
+
+  if (!items.length) return;
+
+  const geocoder = new kakao.maps.services.Geocoder();
+  const bounds   = new kakao.maps.LatLngBounds();
+  let resolved   = 0;
+  statusEl.textContent = `주소 변환 중... (0 / ${items.length})`;
+
+  items.forEach((item, idx) => {
+    const fullAddr = item.gu.name + ' ' + item.prop.addr;
+    const isAuction = item.lv?.mode === '경매';
+    const isDone    = item.done;
+    const num       = idx + 1;
+
+    // 커스텀 오버레이 색상
+    const bg    = isDone ? '#aab0c8' : isAuction ? '#e67e00' : '#1a3a8f';
+    const label = isAuction ? '⚖' : '🏠';
+
+    geocoder.addressSearch(fullAddr, function(result, status) {
+      resolved++;
+      statusEl.textContent = `주소 변환 중... (${resolved} / ${items.length})`;
+
+      if (status === kakao.maps.services.Status.OK) {
+        const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+        bounds.extend(coords);
+
+        // 번호 커스텀 오버레이
+        const overlayContent = `
+          <div style="
+            display:flex;flex-direction:column;align-items:center;
+            cursor:pointer;transform:translateX(-50%);
+          " onclick="openPlanMarkerInfo(${idx})">
+            <div style="
+              width:32px;height:32px;border-radius:50%;
+              background:${bg};color:#fff;
+              font-size:13px;font-weight:800;
+              display:flex;align-items:center;justify-content:center;
+              border:2px solid #fff;
+              box-shadow:0 2px 6px rgba(0,0,0,0.35);
+              font-family:'Noto Sans KR',sans-serif;
+            ">${num}</div>
+            <div style="
+              width:0;height:0;
+              border-left:5px solid transparent;
+              border-right:5px solid transparent;
+              border-top:7px solid ${bg};
+              margin-top:-1px;
+            "></div>
+          </div>`;
+
+        const overlay = new kakao.maps.CustomOverlay({
+          position: coords,
+          content: overlayContent,
+          yAnchor: 1.15,
+          zIndex: 3
+        });
+        overlay.setMap(planMapInstance);
+        planMapOverlays.push(overlay);
+
+        // 말풍선 (InfoWindow)
+        const auc = item.lv?.auction;
+        const iwContent = `
+          <div style="
+            padding:8px 12px;min-width:160px;max-width:220px;
+            font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.7;
+          ">
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+              <span style="
+                font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;
+                background:${isAuction ? '#fff8e0' : '#e8edf8'};
+                color:${isAuction ? '#7c5a00' : '#1a3a8f'};
+                border:1px solid ${isAuction ? '#f0c878' : '#1a3a8f'};
+              ">${label} ${isAuction ? '경매' : '일반'}</span>
+              <b style="font-size:11px;color:#333">${num}번</b>
+            </div>
+            <div style="font-weight:700;color:#0f1733;font-size:13px">${item.prop.addr}</div>
+            <div style="color:#8890aa;font-size:11px">${item.gu.name} · ${item.prop.dtype}</div>
+            ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-top:2px">🔔 ${auc.bidDate}${auc.case ? ' · ' + auc.case : ''}</div>` : ''}
+            ${isDone ? '<div style="color:#1a3a8f;font-size:11px;margin-top:2px">✅ 완료</div>' : ''}
+          </div>`;
+
+        const infowindow = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
+        planMapInfowindows.push(infowindow);
+
+        // 오버레이 클릭 → 말풍선 토글
+        window[`openPlanMarkerInfo`] = function(i) {
+          planMapInfowindows.forEach((iw, j) => {
+            if (j === i) {
+              if (iw.getMap()) iw.close();
+              else iw.open(planMapInstance, planMapOverlays[i]);
+            } else {
+              iw.close();
+            }
+          });
+        };
+      }
+
+      // 모두 완료되면 범위 맞춤
+      if (resolved === items.length) {
+        statusEl.textContent = `📍 총 ${planMapOverlays.length}개 물건 표시됨 · 마커 클릭으로 정보 확인`;
+        if (planMapOverlays.length > 0) {
+          planMapInstance.setBounds(bounds, 60);
+        }
+      }
+    });
+  });
+}
+
+// 레거시 함수 (URL 방식) — 제거
+function openPlanMapNaver() {}
+function openPlanMapKakao() {}
+function getPlanAddrs() { return []; }
+
+// ── 물건 추가 모달 ──────────────────────────────────────────────────
+let planTypeFilter = 'all';
+
 function openAddPlanItem() {
   const date = document.getElementById('plan-date').value;
   if (!date) { alert('날짜를 먼저 선택해주세요'); return; }
-  // 구역 셀렉트 채우기
+  planTypeFilter = 'all';
+  setPlanTypeFilter('all', true);
+
   const guSel = document.getElementById('plan-gu-select');
   guSel.innerHTML = '<option value="">구역을 선택하세요</option>' +
-    data.gus.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-  document.getElementById('plan-prop-select').innerHTML = '<option value="">물건을 선택하세요</option>';
+    data.gus.filter(g => g.props.length).map(g => `<option value="${g.id}">${g.name} (${g.props.length}건)</option>`).join('');
+  document.getElementById('plan-type-filter').style.display = 'none';
+  document.getElementById('plan-prop-list').style.display = 'none';
+  document.getElementById('plan-prop-cards').innerHTML = '';
   openModal('modal-add-plan');
 }
 
-function renderPlanPropSelect() {
-  const guId = document.getElementById('plan-gu-select').value;
-  const propSel = document.getElementById('plan-prop-select');
-  if (!guId) { propSel.innerHTML = '<option value="">물건을 선택하세요</option>'; return; }
-  const gu = data.gus.find(g => String(g.id) === String(guId));
-  propSel.innerHTML = '<option value="">물건을 선택하세요</option>' +
-    (gu?.props || []).map(p => `<option value="${p.id}">${p.addr}</option>`).join('');
+function setPlanTypeFilter(type, silent) {
+  planTypeFilter = type;
+  ['all','normal','auction'].forEach(t => {
+    const id = t === 'all' ? 'pf-all' : t === 'normal' ? 'pf-normal' : 'pf-auction';
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const active = (type === 'all' && t === 'all') || (type === '일반' && t === 'normal') || (type === '경매' && t === 'auction');
+    btn.style.background = active ? 'var(--accent)' : 'var(--surface)';
+    btn.style.color = active ? '#fff' : 'var(--text2)';
+    btn.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+    btn.style.fontWeight = active ? '600' : '400';
+  });
+  if (!silent) renderPlanPropList();
 }
 
+function renderPlanPropList() {
+  const guId = document.getElementById('plan-gu-select').value;
+  const filterEl = document.getElementById('plan-type-filter');
+  const listEl = document.getElementById('plan-prop-list');
+  const cardsEl = document.getElementById('plan-prop-cards');
+  const countEl = document.getElementById('plan-prop-count');
+
+  if (!guId) {
+    filterEl.style.display = 'none';
+    listEl.style.display = 'none';
+    return;
+  }
+
+  filterEl.style.display = 'block';
+  listEl.style.display = 'block';
+
+  const gu = data.gus.find(g => String(g.id) === String(guId));
+  if (!gu) return;
+
+  const date = document.getElementById('plan-date').value;
+  const plan = getPlanForDate(date);
+  const alreadyAdded = new Set((plan?.items || []).map(i => String(i.propId)));
+
+  // 마지막 방문의 mode로 일반/경매 구분
+  let props = gu.props.map(p => {
+    const lastVisit = p.visits[p.visits.length - 1];
+    const mode = lastVisit?.mode || '일반';
+    return { ...p, _mode: mode, _lastVisit: lastVisit };
+  });
+
+  if (planTypeFilter !== 'all') {
+    props = props.filter(p => p._mode === planTypeFilter);
+  }
+
+  countEl.textContent = `${props.length}건`;
+
+  if (!props.length) {
+    cardsEl.innerHTML = `<div style="text-align:center;padding:24px 0;color:var(--text3);font-size:13px">해당 유형의 물건이 없어요</div>`;
+    return;
+  }
+
+  cardsEl.innerHTML = props.map(p => {
+    const added = alreadyAdded.has(String(p.id));
+    const isAuction = p._mode === '경매';
+    const auc = p._lastVisit?.auction;
+    const modeBadge = isAuction
+      ? `<span style="font-size:10px;background:var(--warn-light);color:var(--warn);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid #f0c878">⚖️ 경매</span>`
+      : p._lastVisit
+        ? `<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:1px 6px;border-radius:10px;font-weight:700;border:1px solid var(--accent)">🏠 일반</span>`
+        : `<span style="font-size:10px;background:var(--surface2);color:var(--text3);padding:1px 6px;border-radius:10px;border:1px solid var(--border)">미방문</span>`;
+    return `<div style="background:${added ? 'var(--surface2)' : 'var(--surface)'};border:1.5px solid ${added ? 'var(--accent)' : 'var(--border)'};border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;gap:10px;${added ? 'opacity:0.6' : 'cursor:pointer'}"
+      ${added ? '' : `onclick="addPlanItemDirect('${guId}','${p.id}')"`}
+      onmouseover="${added ? '' : "this.style.borderColor='var(--accent)'"}" onmouseout="${added ? '' : "this.style.borderColor='var(--border)'"}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+          ${modeBadge}
+          <span style="font-size:13px;font-weight:700;color:var(--text)">${p.addr}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${p.dtype}${p._lastVisit ? ' · 최근 방문: ' + p._lastVisit.date : ' · 방문 기록 없음'}</div>
+        ${isAuction && auc?.bidDate ? `<div style="font-size:11px;color:var(--warn);font-weight:600;margin-top:1px">🔔 ${auc.bidDate}${auc.case ? ' · ' + auc.case : ''}</div>` : ''}
+      </div>
+      <span style="font-size:12px;font-weight:600;color:${added ? 'var(--accent)' : 'var(--text3)'};white-space:nowrap;flex-shrink:0">
+        ${added ? '✅ 추가됨' : '+ 추가'}
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function addPlanItemDirect(guId, propId) {
+  const date = document.getElementById('plan-date').value;
+  const plan = getOrCreatePlan(date);
+  if (plan.items.find(i => String(i.propId) === String(propId))) return;
+  plan.items.push({ guId, propId, done: false });
+  saveData();
+  renderPlan();
+  renderPlanPropList(); // 추가됨 상태 갱신
+}
+
+// 레거시 호환 (구 select 방식 → 미사용이지만 혹시 남은 호출 대비)
+function renderPlanPropSelect() {}
 function addPlanItem() {
   const date = document.getElementById('plan-date').value;
-  const guId = document.getElementById('plan-gu-select').value;
-  const propId = document.getElementById('plan-prop-select').value;
-  if (!guId || !propId) { alert('구역과 물건을 선택해주세요'); return; }
+  const guId = document.getElementById('plan-gu-select')?.value;
+  const propId = document.getElementById('plan-prop-select')?.value;
+  if (!guId || !propId) return;
   const plan = getOrCreatePlan(date);
-  // 중복 체크
-  if (plan.items.find(i => String(i.propId) === String(propId))) {
-    alert('이미 추가된 물건입니다'); return;
-  }
+  if (plan.items.find(i => String(i.propId) === String(propId))) return;
   plan.items.push({ guId, propId, done: false });
   saveData();
   closeModal('modal-add-plan');
