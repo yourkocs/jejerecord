@@ -3747,11 +3747,11 @@ function renderPlanKakaoMap() {
             <div style="font-weight:700;color:#0f1733;font-size:13px;margin-bottom:1px">${item.prop.addr}</div>
             <div style="color:#8890aa;font-size:11px;margin-bottom:6px">${item.gu.name} · ${item.prop.dtype}</div>
             ${isAuction && auc?.bidDate ? `<div style="color:#e67e00;font-weight:600;font-size:11px;margin-bottom:6px">🔔 ${auc.bidDate}${auc.case?' · '+auc.case:''}</div>` : ''}
-            <button onclick="openMarkerRoute(${idx},'${date}')"
-              style="width:100%;padding:7px;background:#FEE500;color:#3A1D1D;border:none;border-radius:7px;
-                font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer">
-              🟡 여기로 길찾기
-            </button>
+            <div style="background:#FEE500;border-radius:8px;padding:9px 12px;margin-top:6px;text-align:center;cursor:pointer"
+              onclick="launchKakaoMap('${encodeURIComponent(fullAddr)}',${lat},${lng})">
+              <div style="font-size:13px;font-weight:800;color:#3A1D1D">🗺 카카오맵으로 길찾기</div>
+              <div style="font-size:10px;color:#5a3a00;margin-top:2px">이 장소를 목적지로 카카오맵이 실행됩니다</div>
+            </div>
           </div>`;
 
         const iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
@@ -3776,27 +3776,15 @@ window.openPlanMarkerInfo = function(i) {
   });
 };
 
-// 마커 말풍선에서 길찾기 버튼 클릭
-window.openMarkerRoute = function(idx, date) {
-  const plan = getPlanForDate(date);
-  if (!plan) return;
-  const dest = planCoords[idx];
-  if (!dest) { alert('지도를 열어 좌표 변환 후 사용하세요.'); return; }
-
-  // 이전 물건 정보
-  let prevInfo = null;
-  if (idx > 0 && planCoords[idx-1]) {
-    prevInfo = planCoords[idx-1];
-  }
-
-  // 기존 바텀시트 닫기
-  const existSheet = document.getElementById('plan-route-sheet');
-  if (existSheet) existSheet.style.transform = 'translateY(100%)';
-
-  // 말풍선 닫기
+// 마커 클릭 → 카카오맵 앱 바로 실행 (앱 없으면 웹 폴백)
+window.launchKakaoMap = function(destEnc, dLat, dLng) {
   planMapInfowindows.forEach(iw => { try { iw?.close(); } catch(e){} });
-
-  setTimeout(() => openPlanRouteSheet(idx, date, dest, prevInfo), 150);
+  const dest   = decodeURIComponent(destEnc);
+  const appUrl = `kakaomap://route?ep=${dLat},${dLng}&by=CAR`;
+  const webUrl = `https://map.kakao.com/?eName=${encodeURIComponent(dest)}&eX=${dLng}&eY=${dLat}&service=`;
+  const t = Date.now();
+  window.location.href = appUrl;
+  setTimeout(() => { if (Date.now() - t < 1500) window.open(webUrl, '_blank'); }, 500);
 };
 
 function openPlanRouteSheet(idx, date, dest, prevInfo) {
